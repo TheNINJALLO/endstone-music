@@ -20,8 +20,9 @@
 </p>
 
 <p align="center">
-  <a href="#overview">Overview</a> &bull;
-  <a href="#compatibility">Compatibility</a> &bull;
+  <a href="#what-it-does">What it does</a> &bull;
+  <a href="#how-to-use">How to use</a> &bull;
+  <a href="#commands-and-permissions">Commands</a> &bull;
   <a href="#install">Install</a> &bull;
   <a href="https://github.com/TheNINJALLO/endstone-music/releases">Releases</a>
 </p>
@@ -30,9 +31,24 @@
 
 A plugin to trigger custom music on block interaction and auto-generate resource packs. This release is aligned with Endstone 0.11.8 and Minecraft Bedrock Dedicated Server 1.26.40, and is distributed as a Python wheel for direct installation in an Endstone server.
 
-## Capabilities
+## What it does
 
--
+- Plays custom music when configured item, block, or item-and-block interactions occur.
+- Builds a Bedrock resource pack from uploaded OGG, MP3, or WAV audio.
+- Provides form-based trigger creation, trigger management, distance, volume, pitch, broadcast, and message settings.
+
+## How to use
+
+1. Place audio files in the plugin's `uploads/` directory, then run `/cmusic generate`.
+2. Restart the server so clients receive the generated resource pack.
+3. Run `/cmusic`, create a trigger, and select its item/block conditions and sound settings.
+4. Use `/cmusic reload` after supported manual configuration edits.
+
+## Commands and permissions
+
+| Command / usage | What it does | Access |
+|---|---|---|
+| `/cmusic`<br>`/cmusic <reload\|generate\|migrate>` | Manage custom music triggers and resource packs | `endstone_music.command.cmusic` |
 
 ## Compatibility
 
