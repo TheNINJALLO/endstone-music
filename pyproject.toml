@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "endstone_music"
-version = "0.1.1"
+version = "0.1.2"
 description = "A plugin to trigger custom music on block interaction and auto-generate resource packs."
 requires-python = ">=3.10"
 authors = [{name = "Antigravity", email = "antigravity@example.com"}]
 dependencies = [
-    "endstone>=0.11.8,<0.12",
+    "endstone>=0.11.9,<0.12",
     "pydub",
     "static-ffmpeg"
 ]
@@ -19,7 +19,7 @@ music = "endstone_music:EndstoneMusicPlugin"
 
 [tool.endstone]
 name = "music"
-version = "0.1.1"
+version = "0.1.2"
 main = "endstone_music:EndstoneMusicPlugin"
 description = "Custom music plugin"
 requires-python = ">=3.10"
