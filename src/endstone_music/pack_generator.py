@@ -1,304 +1,243 @@
+"""Staged, backed-up BP/RP generation. Uploads are never removed or modified."""
+from __future__ import annotations
+import copy
 import json
-import os
+import math
+import re
 import shutil
+import subprocess
+import struct
+import zlib
+import tempfile
 import uuid
 from pathlib import Path
-from typing import List, Dict
+from endstone_music.playlists import atomic_json, ID
 
-# Try to use static-ffmpeg if available (pip-installed FFmpeg)
-try:
-    import static_ffmpeg
-    static_ffmpeg.add_paths()  # Adds ffmpeg/ffprobe to PATH
-except ImportError:
-    pass
+GLOBAL_PREFIX = "endstone_music.global."
 
-try:
-    from pydub import AudioSegment
-    HAS_PYDUB = True
-except ImportError:
-    HAS_PYDUB = False
+
+def read_json(path, default):
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else copy.deepcopy(default)
+
+
+def reject_links(path, tree=False):
+    path = Path(path).absolute()
+    if any(part.is_symlink() for part in (path, *path.parents)):
+        raise ValueError(f"Symlink paths are not supported for music packs: {path}")
+    if tree and path.exists() and any(child.is_symlink() for child in path.rglob("*")):
+        raise ValueError(f"Symlinks inside pack directories are not supported: {path}")
+
 
 class PackGenerator:
-    def __init__(self, key: str = "endstone_music", data_path: Path = None):
+    def __init__(self, key="endstone_music", data_path=None):
         self.key = key
-        self.data_path = data_path
-        self.metadata_file = data_path / "pack_metadata.json" if data_path else None
-        
-        # Load or create metadata (UUIDs and version)
-        self._load_metadata()
-    
-    def _load_metadata(self):
-        """Load or create pack metadata (UUIDs and version)."""
-        if self.metadata_file and self.metadata_file.exists():
-            try:
-                with open(self.metadata_file, "r") as f:
-                    data = json.load(f)
-                    self.pack_uuid = data.get("pack_uuid", str(uuid.uuid4()))
-                    self.module_uuid = data.get("module_uuid", str(uuid.uuid4()))
-                    self.version = data.get("version", [1, 0, 0])
-            except:
-                self._init_new_metadata()
-        else:
-            self._init_new_metadata()
-    
-    def _init_new_metadata(self):
-        """Initialize new metadata."""
-        self.pack_uuid = str(uuid.uuid4())
-        self.module_uuid = str(uuid.uuid4())
-        self.version = [1, 0, 0]
-    
-    def _save_metadata(self):
-        """Save metadata to file."""
-        if self.metadata_file:
-            with open(self.metadata_file, "w") as f:
-                json.dump({
-                    "pack_uuid": self.pack_uuid,
-                    "module_uuid": self.module_uuid,
-                    "version": self.version
-                }, f, indent=2)
-    
-    def _bump_version(self):
-        """Increment the patch version."""
-        self.version[2] += 1
-        self._save_metadata()
-    
-    def generate(self, upload_dir: Path, output_dir: Path, pack_name: str) -> List[str]:
-        """
-        Generates a resource pack from the upload directory.
-        Returns a list of registered sound names (e.g. 'custom.songname').
-        """
-        if not upload_dir.exists():
-            upload_dir.mkdir(parents=True, exist_ok=True)
-            return []
+        self.data_path = Path(data_path or ".")
+        self.data_path.mkdir(parents=True, exist_ok=True)
+        self.metadata_file = self.data_path / "pack_metadata.json"
+        self.metadata = read_json(self.metadata_file, {})
+        for key in ("pack_uuid", "module_uuid", "behavior_uuid", "behavior_module_uuid"):
+            self.metadata.setdefault(key, str(uuid.uuid4()))
+            uuid.UUID(self.metadata[key])
+        self.pack_uuid = self.metadata["pack_uuid"]
+        self.module_uuid = self.metadata["module_uuid"]
+        self.version = self.metadata.get("version", [1, 0, 0])
+        if not isinstance(self.version, list) or len(self.version) != 3 or any(type(x) is not int or x < 0 for x in self.version):
+            raise ValueError("Invalid pack metadata version")
+        self.last_registered_sounds = []
 
-        # Bump version on each regeneration
-        self._bump_version()
-        
-        # Create pack directory if it doesn't exist (don't delete existing!)
-        pack_dir = output_dir / f"{self.key}_pack"
-        pack_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Internal sound directory
-        sounds_dir = pack_dir / "sounds" / "custom"
-        sounds_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Load existing sound definitions if they exist
-        sounds_root = pack_dir / "sounds"
-        sound_defs_path = sounds_root / "sound_definitions.json"
-        
-        if sound_defs_path.exists():
-            try:
-                with open(sound_defs_path, "r") as f:
-                    sound_defs = json.load(f)
-            except:
-                sound_defs = {"format_version": "1.14.0", "sound_definitions": {}}
-        else:
-            sound_defs = {"format_version": "1.14.0", "sound_definitions": {}}
-        
-        # Get already registered sound names
-        registered_sounds = list(sound_defs.get("sound_definitions", {}).keys())
-        
-        # Walk uploads - supports ogg, mp3, wav
-        extensions = ["*.ogg", "*.mp3", "*.wav"]
-        files_to_process = []
-        for ext in extensions:
-            files_to_process.extend(upload_dir.glob(ext))
-
-        for file in files_to_process:
-            # Sanitize file name - replace spaces with underscores
-            safe_stem = file.stem.replace(" ", "_").replace("-", "_")
-            sound_name = f"custom.{safe_stem}"
-            target_path = sounds_dir / f"{safe_stem}.ogg"
-            
-            # Skip if already registered and file exists
-            if sound_name in registered_sounds and target_path.exists():
-                print(f"Skipping {file.name}: already registered.")
-                continue
-            
-            # Conversion Logic
-            if file.suffix.lower() == ".ogg":
-                # Re-process OGG to ensure format if pydub available
-                if HAS_PYDUB:
-                    try:
-                        audio = AudioSegment.from_file(str(file))
-                        audio = audio.set_channels(2).set_frame_rate(44100)
-                        audio.export(str(target_path), format="ogg", parameters=["-map_metadata", "-1"])
-                        print(f"Processed {file.name} to ogg (Stereo, 44.1kHz).")
-                    except Exception as e:
-                        print(f"Failed to process {file.name}: {e}. Fallback to copy.")
-                        shutil.copy2(file, target_path)
-                else:
-                    shutil.copy2(file, target_path)
-            elif HAS_PYDUB:
-                try:
-                    audio = AudioSegment.from_file(str(file))
-                    audio = audio.set_channels(2).set_frame_rate(44100)
-                    audio.export(str(target_path), format="ogg", parameters=["-map_metadata", "-1"])
-                    print(f"Converted {file.name} to ogg.")
-                    # Delete source file after successful conversion
-                    try:
-                        file.unlink()
-                        print(f"Deleted source file: {file.name}")
-                    except Exception as e:
-                        print(f"Could not delete {file.name}: {e}")
-                except Exception as e:
-                    print(f"Failed to convert {file.name}: {e}. Skipping.")
+    def generate(self, upload_dir, output_dir, pack_name, playlists=None):
+        upload_dir, output_dir = Path(upload_dir), Path(output_dir)
+        reject_links(upload_dir, tree=True)
+        reject_links(output_dir, tree=True)
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        playlists = playlists or {}
+        if any(not ID.fullmatch(x) for x in playlists):
+            raise ValueError("Invalid playlist identifier")
+        destination = output_dir / f"{self.key}_pack"
+        version = [*self.version[:2], self.version[2] + 1]
+        with tempfile.TemporaryDirectory(prefix="music-build-", dir=output_dir) as temp:
+            stage = Path(temp) / destination.name
+            if destination.exists():
+                shutil.copytree(destination, stage)
+            else:
+                stage.mkdir()
+            sounds = stage / "sounds" / "custom"
+            sounds.mkdir(parents=True, exist_ok=True)
+            definitions = read_json(stage / "sounds" / "sound_definitions.json", {"format_version": "1.14.0", "sound_definitions": {}})
+            entries = definitions["sound_definitions"]
+            durations = read_json(self.data_path / "track_durations.json", {})
+            seen = set()
+            for file in sorted(upload_dir.iterdir()):
+                if not file.is_file() or file.suffix.lower() not in (".ogg", ".wav", ".mp3"):
                     continue
-            else:
-                print(f"Skipping {file.name}: pydub not installed or ffmpeg missing.")
-                continue
+                stem = re.sub(r"[ -]", "_", file.stem.lower())
+                if not ID.fullmatch(stem) or stem in seen:
+                    raise ValueError(f"Unsafe or duplicate normalized audio filename: {file.name}")
+                seen.add(stem)
+                target = sounds / f"{stem}.ogg"
+                # FFmpeg is only invoked from installed PATH; no executable downloads.
+                if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+                    raise RuntimeError("Install FFmpeg/ffprobe before generating audio packs")
+                subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(file), "-vn", "-ac", "2", "-ar", "44100", "-c:a", "libvorbis", "-map_metadata", "-1", str(target)], check=True, timeout=600)
+                probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(target)], check=True, capture_output=True, text=True, timeout=30)
+                duration = float(probe.stdout.strip())
+                if not math.isfinite(duration) or not 0.05 <= duration <= 86400:
+                    raise ValueError(f"Invalid audio duration: {file.name}")
+                durations[f"custom.{stem}"] = duration
+                entries[f"custom.{stem}"] = {"category": "neutral", "sounds": [f"sounds/custom/{stem}"]}
+            # Add dedicated 2D aliases; original spatial triggers retain their sound IDs.
+            for name, definition in list(entries.items()):
+                if name.startswith(GLOBAL_PREFIX):
+                    continue
+                alias = copy.deepcopy(definition)
+                alias["sounds"] = [dict(s if isinstance(s, dict) else {"name": s}, is3D=False, stream=True) for s in definition["sounds"]]
+                entries[GLOBAL_PREFIX + name] = alias
+            atomic_json(stage / "sounds" / "sound_definitions.json", definitions, False)
+            atomic_json(stage / "manifest.json", self._manifest(pack_name, "resources", version), False)
+            behavior = Path(temp) / f"{self.key}_behavior"
+            self._custom_content(stage, behavior, playlists, version)
+            self._publish(stage, destination)
+            self._publish(behavior, output_dir / behavior.name)
+            self.version = version
+            self.metadata["version"] = version
+            atomic_json(self.metadata_file, self.metadata)
+            atomic_json(self.data_path / "track_durations.json", durations)
+        self.last_registered_sounds = sorted(x for x in entries if not x.startswith(GLOBAL_PREFIX))
+        return self.last_registered_sounds
 
-            # Add to definitions
-            # Use "neutral" category so vanilla sounds don't stop custom sounds
-            sound_defs["sound_definitions"][sound_name] = {
-                "category": "neutral",
-                "sounds": [
-                    f"sounds/custom/{safe_stem}"
-                ]
-            }
-            registered_sounds.append(sound_name)
-            
-        # Write sound_definitions.json (goes in sounds folder)
-        sounds_root = pack_dir / "sounds"
-        sounds_root.mkdir(parents=True, exist_ok=True)
-        with open(sounds_root / "sound_definitions.json", "w") as f:
-            json.dump(sound_defs, f, indent=2)
-            
-        # Write manifest.json
-        manifest = {
-            "format_version": 2,
-            "header": {
-                "description": f"Generated by {self.key}",
-                "name": pack_name,
-                "uuid": self.pack_uuid,
-                "version": self.version.copy(),
-                "min_engine_version": [1, 16, 0]
-            },
-            "modules": [
-                {
-                    "description": "Custom music",
-                    "type": "resources",
-                    "uuid": self.module_uuid,
-                    "version": self.version.copy()
-                }
-            ]
-        }
-        
-        with open(pack_dir / "manifest.json", "w") as f:
-            json.dump(manifest, f, indent=2)
-        
-        # Save sounds registry for easy lookup
-        self.last_registered_sounds = registered_sounds
-            
-        return registered_sounds
+    def _manifest(self, name, kind, version):
+        behavior = kind == "data"
+        doc = {"format_version": 2, "header": {"name": name, "description": "Endstone Music generated content", "uuid": self.metadata["behavior_uuid" if behavior else "pack_uuid"], "version": version, "min_engine_version": [1, 21, 80]}, "modules": [{"type": kind, "uuid": self.metadata["behavior_module_uuid" if behavior else "module_uuid"], "version": version}]}
+        if behavior:
+            doc["dependencies"] = [{"uuid": self.pack_uuid, "version": version}]
+        return doc
 
-    def install_to_world(self, world_dir: Path, world_name: str):
-        """
-        Updates the world_resource_packs.json to include this pack.
-        """
-        # Look for the world directory
-        target_world = world_dir / world_name
-        if not target_world.exists():
-            # Try case-insensitive lookup
-            for child in world_dir.iterdir():
-                if child.is_dir() and child.name.lower() == world_name.lower():
-                    target_world = child
-                    break
-        
-        if not target_world.exists():
-            print(f"World '{world_name}' not found.")
-            return False
-
-        config_path = target_world / "world_resource_packs.json"
-        
-        current_config = []
-        if config_path.exists():
-            try:
-                with open(config_path, "r") as f:
-                    current_config = json.load(f)
-            except:
-                current_config = []
-        
-        # Check if already exists - update version if so
-        found = False
-        for entry in current_config:
-            if entry.get("pack_id") == self.pack_uuid:
-                entry["version"] = self.version.copy()  # Update version
-                found = True
-                break
-        
-        if not found:
-            # Add to top of stack
-            new_entry = {
-                "pack_id": self.pack_uuid,
-                "version": self.version.copy()
-            }
-            current_config.insert(0, new_entry)
-        
-        with open(config_path, "w") as f:
-            json.dump(current_config, f, indent=2)
-            
-        return True
-    
-    def migrate_sound_categories(self, output_dir: Path) -> dict:
-        """
-        Migrate existing sound_definitions.json to use 'neutral' category instead of 'music'.
-        This is a one-time fix for existing packs so vanilla sounds don't stop custom sounds.
-        
-        Returns a dict with migration results.
-        """
-        pack_dir = output_dir / f"{self.key}_pack"
-        sound_defs_path = pack_dir / "sounds" / "sound_definitions.json"
-        
-        result = {
-            "success": False,
-            "migrated_count": 0,
-            "message": ""
-        }
-        
-        if not sound_defs_path.exists():
-            result["message"] = "No existing sound_definitions.json found. Run /cmusic generate first."
-            return result
-        
+    @staticmethod
+    def _publish(stage, target):
+        reject_links(stage, tree=True)
+        reject_links(target, tree=True)
+        reject_links(target.with_name(target.name + ".backup"), tree=True)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        backup = target.with_name(target.name + ".backup")
+        prepared = target.with_name(target.name + ".prepared-" + uuid.uuid4().hex)
+        shutil.copytree(stage, prepared)
         try:
-            with open(sound_defs_path, "r") as f:
-                sound_defs = json.load(f)
-            
-            migrated_count = 0
-            definitions = sound_defs.get("sound_definitions", {})
-            
-            for sound_name, sound_config in definitions.items():
-                if sound_config.get("category") == "music":
-                    sound_config["category"] = "neutral"
-                    migrated_count += 1
-            
-            if migrated_count > 0:
-                # Save the updated definitions
-                with open(sound_defs_path, "w") as f:
-                    json.dump(sound_defs, f, indent=2)
-                
-                # Bump version since pack changed
-                self._bump_version()
-                
-                # Update manifest with new version
-                manifest_path = pack_dir / "manifest.json"
-                if manifest_path.exists():
-                    with open(manifest_path, "r") as f:
-                        manifest = json.load(f)
-                    manifest["header"]["version"] = self.version.copy()
-                    manifest["modules"][0]["version"] = self.version.copy()
-                    with open(manifest_path, "w") as f:
-                        json.dump(manifest, f, indent=2)
-                
-                result["success"] = True
-                result["migrated_count"] = migrated_count
-                result["message"] = f"Migrated {migrated_count} sound(s) from 'music' to 'neutral' category."
-            else:
-                result["success"] = True
-                result["message"] = "No sounds needed migration. All sounds already use 'neutral' category."
-            
-            return result
-            
-        except Exception as e:
-            result["message"] = f"Migration failed: {str(e)}"
-            return result
+            if target.exists():
+                if backup.exists():
+                    shutil.rmtree(backup)
+                target.rename(backup)
+            try:
+                prepared.rename(target)
+            except Exception:
+                if backup.exists() and not target.exists():
+                    backup.rename(target)
+                raise
+        finally:
+            if prepared.exists():
+                shutil.rmtree(prepared)
+
+    @staticmethod
+    def _texture(path, record=False):
+        # Original 16x16 pixel art, written without imaging dependencies.
+        rows = []
+        for y in range(16):
+            row = bytearray()
+            for x in range(16):
+                radius = (x - 7.5) ** 2 + (y - 7.5) ** 2
+                if record:
+                    color = (66, 224, 185, 255) if radius < 10 else (29, 35, 52, 255) if radius < 55 else (0, 0, 0, 0)
+                else:
+                    color = (65, 215, 175, 255) if 3 <= x <= 12 and 5 <= y <= 10 else (57, 38, 62, 255) if (x + y) % 3 else (92, 57, 76, 255)
+                row.extend(color)
+            rows.append(b"\0" + bytes(row))
+        def chunk(kind, data):
+            return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 16, 16, 8, 6, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(b"".join(rows))) + chunk(b"IEND", b""))
+
+    def _custom_content(self, resource, behavior, playlists, version):
+        atomic_json(behavior / "manifest.json", self._manifest("Endstone Music Jukebox", "data", version), False)
+        for name in playlists:
+            atomic_json(behavior / "items" / f"playlist_{name}.json", {"format_version": "1.21.80", "minecraft:item": {"description": {"identifier": f"endstone_music:playlist_{name}", "menu_category": {"category": "items"}}, "components": {"minecraft:display_name": {"value": f"Playlist: {name}"}, "minecraft:icon": {"textures": {"default": "endstone_music_playlist"}}, "minecraft:max_stack_size": 1}}}, False)
+        atomic_json(behavior / "blocks" / "jukebox.json", {"format_version": "1.21.80", "minecraft:block": {"description": {"identifier": "endstone_music:jukebox", "menu_category": {"category": "construction"}}, "components": {"minecraft:geometry": "minecraft:geometry.full_block", "minecraft:material_instances": {"*": {"texture": "endstone_music_jukebox", "render_method": "opaque"}}, "minecraft:destructible_by_mining": {"seconds_to_destroy": 2}, "minecraft:destructible_by_explosion": {"explosion_resistance": 1200}, "minecraft:movable": {"movement_type": "immovable"}}}}, False)
+        for filename, atlas_name, key, texture in (
+            ("item_texture.json", "atlas.items", "endstone_music_playlist", "textures/items/endstone_music_playlist"),
+            ("terrain_texture.json", "atlas.terrain", "endstone_music_jukebox", "textures/blocks/endstone_music_jukebox"),
+        ):
+            path = resource / "textures" / filename
+            atlas = read_json(path, {"resource_pack_name": "endstone_music", "texture_name": atlas_name, "texture_data": {}})
+            atlas.setdefault("texture_data", {})[key] = {"textures": texture}
+            atomic_json(path, atlas, False)
+        blocks_path = resource / "blocks.json"
+        blocks = read_json(blocks_path, {"format_version": [1, 1, 0]})
+        blocks["endstone_music:jukebox"] = {"sound": "wood"}
+        atomic_json(blocks_path, blocks, False)
+        self._texture(resource / "textures" / "items" / "endstone_music_playlist.png", True)
+        self._texture(resource / "textures" / "blocks" / "endstone_music_jukebox.png")
+        texts = resource / "texts"
+        texts.mkdir(exist_ok=True)
+        language = texts / "en_US.lang"
+        lines = language.read_text(encoding="utf-8").splitlines() if language.exists() else []
+        lines = [line for line in lines if not line.startswith("tile.endstone_music:jukebox.name=")]
+        lines.append("tile.endstone_music:jukebox.name=Music Jukebox")
+        language.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        languages = read_json(texts / "languages.json", [])
+        if "en_US" not in languages:
+            languages.append("en_US")
+        atomic_json(texts / "languages.json", languages, False)
+
+    def install_to_world(self, world_dir, world_name):
+        worlds = Path(world_dir)
+        if Path(world_name).name != world_name:
+            raise ValueError("World name must be a folder name")
+        target = next((p for p in worlds.iterdir() if p.is_dir() and not p.is_symlink() and p.name.lower() == world_name.lower()), None)
+        if target is None:
+            return False
+        reject_links(target / "resource_packs", tree=True)
+        reject_links(target / "behavior_packs", tree=True)
+        behavior_source = target / "resource_packs" / f"{self.key}_behavior"
+        updates = []
+        # Preflight BOTH pack lists before publishing any world changes.
+        for filename, pack_id in (("world_resource_packs.json", self.pack_uuid), ("world_behavior_packs.json", self.metadata["behavior_uuid"])):
+            path = target / filename
+            reject_links(path)
+            reject_links(path.with_name(path.name + ".bak"))
+            current = read_json(path, [])
+            if not isinstance(current, list) or any(not isinstance(x, dict) or "pack_id" not in x for x in current):
+                raise ValueError(f"Invalid {filename}; unchanged")
+            current = [x for x in current if x["pack_id"] != pack_id]
+            current.insert(0, {"pack_id": pack_id, "version": self.version})
+            updates.append((path, current))
+        if behavior_source.exists():
+            self._publish(behavior_source, target / "behavior_packs" / behavior_source.name)
+        for path, current in updates:
+            atomic_json(path, current)
+        return True
+
+    def migrate_sound_categories(self, output_dir):
+        # Full generate adds 2D aliases while retaining all existing sounds.
+        return {"success": False, "migrated_count": 0, "message": "Run /cmusic generate to add non-spatial aliases, retaining existing spatial sound IDs."}
+
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Generate music BP/RP offline; never activates a world")
+    parser.add_argument("--data", type=Path, required=True, help="Pack metadata and durations directory")
+    parser.add_argument("--uploads", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--playlists", type=Path, help="Validated playlists.json")
+    args = parser.parse_args()
+    playlists = {}
+    if args.playlists:
+        from endstone_music.playlists import validate
+        playlists = validate(read_json(args.playlists, {}))["playlists"]
+    generator = PackGenerator(data_path=args.data)
+    names = generator.generate(args.uploads, args.output, "Endstone Music", playlists)
+    atomic_json(args.data / "sounds_registry.json", names)
+    atomic_json(args.data / "global_sounds_registry.json", names)
+    print(f"Generated {len(names)} sounds. BP/RP saved to {args.output}. No world activated.")
+
+
+if __name__ == "__main__":
+    main()

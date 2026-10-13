@@ -4,14 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "endstone_music"
-version = "0.1.2"
+version = "0.2.0"
 description = "A plugin to trigger custom music on block interaction and auto-generate resource packs."
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [{name = "Antigravity", email = "antigravity@example.com"}]
 dependencies = [
-    "endstone>=0.11.9,<0.12",
-    "pydub",
-    "static-ffmpeg"
+    "endstone>=0.11.14,<0.12",
 ]
 
 [project.entry-points."endstone"]
@@ -19,14 +17,14 @@ music = "endstone_music:EndstoneMusicPlugin"
 
 [tool.endstone]
 name = "music"
-version = "0.1.2"
+version = "0.2.0"
 main = "endstone_music:EndstoneMusicPlugin"
 description = "Custom music plugin"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = ["Antigravity"]
 
 [tool.endstone.commands]
-cmusic = { description = "Manage custom music", usages = ["/cmusic <reload|generate>"], permissions = ["endstone_music.command.cmusic"] }
+cmusic = { description = "Manage custom music", usages = ["/cmusic", "/cmusic <reload|generate|migrate|playlists|stop|next|status>", "/cmusic <play|give> <id: str>", "/cmusic <playlist> <create|delete> <id: str>", "/cmusic <playlist> <add> <id: str> <sound: str> [seconds: float]", "/cmusic <playlist> <remove> <id: str> <track: int>", "/cmusic <playlist> <move> <id: str> <from: int> <to: int>", "/cmusic <playlist> <loop> <id: str> <on|off>"], permissions = ["endstone_music.command.cmusic"] }
 
 [tool.endstone.permissions]
 "endstone_music.command.cmusic" = { description = "Allow using cmusic command", default = "op" }

@@ -4,20 +4,22 @@ import json
 import os
 
 from endstone.plugin import Plugin
-from endstone.event import event_handler, EventPriority, PlayerInteractEvent, PlayerJoinEvent
+from endstone.event import event_handler, EventPriority, PlayerInteractEvent, PlayerJoinEvent, PlayerQuitEvent, BlockBreakEvent
 from endstone.command import Command, CommandSender
 from endstone import ColorFormat, Player
 from endstone.form import ActionForm, ModalForm, Dropdown, TextInput, Slider, Toggle
 
 from endstone_music.pack_generator import PackGenerator
+from endstone_music.playlists import atomic_json
+from endstone_music.music_controls import MusicControls, block_key, JUKEBOX, type_id
 
-class EndstoneMusicPlugin(Plugin):
+class EndstoneMusicPlugin(MusicControls, Plugin):
     api_version = "0.11"
     
     commands = {
         "cmusic": {
             "description": "Manage custom music triggers and resource packs",
-            "usages": ["/cmusic", "/cmusic <reload|generate|migrate>"],
+            "usages": ["/cmusic", "/cmusic <reload|generate|migrate|playlists|stop|next|status>", "/cmusic <play|give> <id: str>", "/cmusic <playlist> <create|delete> <id: str>", "/cmusic <playlist> <add> <id: str> <sound: str> [seconds: float]", "/cmusic <playlist> <remove> <id: str> <track: int>", "/cmusic <playlist> <move> <id: str> <from: int> <to: int>", "/cmusic <playlist> <loop> <id: str> <on|off>"],
             "permissions": ["endstone_music.command.cmusic"]
         }
     }
@@ -47,6 +49,10 @@ class EndstoneMusicPlugin(Plugin):
         
         # Track currently playing custom sounds per player (player_name -> set of sound names)
         self.playing_sounds = {}
+        self.legacy_sound_tokens = {}
+        self.legacy_join_tasks = []
+        self.legacy_generation = 0
+        self.setup_music()
 
     def load_config(self):
         if not self.cmusic_config_file.exists():
@@ -72,19 +78,21 @@ class EndstoneMusicPlugin(Plugin):
                     }
                 ]
             }
-            with open(self.cmusic_config_file, "w") as f:
-                json.dump(default_config, f, indent=2)
+            atomic_json(self.cmusic_config_file, default_config)
             self.cmusic_config = default_config
         else:
             with open(self.cmusic_config_file, "r") as f:
                 self.cmusic_config = json.load(f)
 
     def save_config(self):
-        with open(self.cmusic_config_file, "w") as f:
-            json.dump(self.cmusic_config, f, indent=2)
+        atomic_json(self.cmusic_config_file, self.cmusic_config)
 
     def on_command(self, sender: CommandSender, command: Command, args: list[str]) -> bool:
         if command.name == "cmusic":
+            if not self.require_operator(sender):
+                return True
+            if args and self.music_command(sender, args):
+                return True
             if not args and isinstance(sender, Player):
                 self.send_main_menu(sender)
                 return True
@@ -96,7 +104,21 @@ class EndstoneMusicPlugin(Plugin):
             action = args[0].lower()
             
             if action == "reload":
-                self.load_config()
+                try:
+                    # Validate both files before disturbing the current session.
+                    candidate = json.loads(self.cmusic_config_file.read_text(encoding="utf-8"))
+                    if not isinstance(candidate, dict) or not isinstance(candidate.get("triggers", []), list):
+                        raise ValueError("Invalid config structure")
+                    self.playlists.reload()
+                except (ValueError, OSError) as error:
+                    sender.send_message(f"Reload failed; current music unchanged: {error}")
+                    return True
+                self.music.stop()
+                self.legacy_generation += 1
+                for task in self.legacy_join_tasks:
+                    task.cancel()
+                self.legacy_join_tasks.clear()
+                self.cmusic_config = candidate
                 sender.send_message(f"{ColorFormat.GREEN}Configuration reloaded!")
                 return True
                 
@@ -110,16 +132,19 @@ class EndstoneMusicPlugin(Plugin):
                 
                 worlds_dir = server_root / "worlds"
                 world_name = self.cmusic_config.get("target_world_name", "Bedrock level")
+                if not isinstance(world_name, str) or Path(world_name).name != world_name:
+                    sender.send_message("Invalid target_world_name; must be a direct world folder name.")
+                    return True
                 
                 # Find the world folder (case-insensitive search)
                 target_world = None
                 if worlds_dir.exists():
                     for child in worlds_dir.iterdir():
-                        if child.is_dir() and child.name.lower() == world_name.lower():
+                        if child.is_dir() and not child.is_symlink() and child.name.lower() == world_name.lower():
                             target_world = child
                             break
                     # Exact match fallback
-                    if not target_world and (worlds_dir / world_name).exists():
+                    if not target_world and (worlds_dir / world_name).is_dir() and not (worlds_dir / world_name).is_symlink():
                         target_world = worlds_dir / world_name
                 
                 if not target_world:
@@ -135,21 +160,31 @@ class EndstoneMusicPlugin(Plugin):
                 sender.send_message(f"{ColorFormat.GRAY}  World: {target_world}")
                 sender.send_message(f"{ColorFormat.GRAY}  Resource packs: {resource_packs_dir}")
                 
-                sounds = self.generator.generate(
-                    self.upload_dir, 
-                    resource_packs_dir, 
-                    self.cmusic_config.get("pack_name", "Music Pack")
-                )
+                try:
+                    sounds = self.generator.generate(
+                        self.upload_dir, resource_packs_dir,
+                        self.cmusic_config.get("pack_name", "Music Pack"),
+                        self.playlists.data["playlists"]
+                    )
+                except Exception as error:
+                    self.logger.error(f"Pack generation failed: {error}")
+                    sender.send_message(f"Pack generation failed; uploads retained: {error}")
+                    return True
                 
                 sender.send_message(f"{ColorFormat.GREEN}Pack generated with {len(sounds)} sounds!")
                 
                 # Save sounds registry for dropdown
                 registry_file = self.data_path / "sounds_registry.json"
-                with open(registry_file, "w") as f:
-                    json.dump(sounds, f, indent=2)
+                atomic_json(registry_file, sounds)
+                atomic_json(self.data_path / "global_sounds_registry.json", sounds)
                 
                 # Update world_resource_packs.json
-                if self.generator.install_to_world(worlds_dir, world_name):
+                try:
+                    installed = self.generator.install_to_world(worlds_dir, world_name)
+                except (ValueError, OSError) as error:
+                    sender.send_message(f"Packs generated but world activation failed: {error}. Check backups before restarting.")
+                    return True
+                if installed:
                     sender.send_message(f"{ColorFormat.GREEN}Installed to world '{world_name}'. Please RESTART the server.")
                 else:
                     sender.send_message(f"{ColorFormat.YELLOW}Pack created but could not update world_resource_packs.json automatically.")
@@ -166,15 +201,18 @@ class EndstoneMusicPlugin(Plugin):
                 
                 worlds_dir = server_root / "worlds"
                 world_name = self.cmusic_config.get("target_world_name", "Bedrock level")
+                if not isinstance(world_name, str) or Path(world_name).name != world_name:
+                    sender.send_message("Invalid target_world_name; must be a direct world folder name.")
+                    return True
                 
                 # Find the world folder
                 target_world = None
                 if worlds_dir.exists():
                     for child in worlds_dir.iterdir():
-                        if child.is_dir() and child.name.lower() == world_name.lower():
+                        if child.is_dir() and not child.is_symlink() and child.name.lower() == world_name.lower():
                             target_world = child
                             break
-                    if not target_world and (worlds_dir / world_name).exists():
+                    if not target_world and (worlds_dir / world_name).is_dir() and not (worlds_dir / world_name).is_symlink():
                         target_world = worlds_dir / world_name
                 
                 if not target_world:
@@ -225,6 +263,9 @@ class EndstoneMusicPlugin(Plugin):
     
     def stop_custom_sounds_for_player(self, player_name: str):
         """Stop only custom plugin sounds for a specific player, not vanilla sounds."""
+        if not hasattr(self, "legacy_sound_tokens"):
+            self.legacy_sound_tokens = {}
+        self.legacy_sound_tokens[player_name] = self.legacy_sound_tokens.get(player_name, 0) + 1
         if player_name in self.playing_sounds:
             for sound in self.playing_sounds[player_name]:
                 # Only stop custom sounds (from our plugin)
@@ -261,6 +302,7 @@ class EndstoneMusicPlugin(Plugin):
             title="Music Plugin Menu",
             content="Choose an action:"
         )
+        form.add_button("Global Music / Playlists", on_click=self.send_playlists_menu)
         form.add_button("Add New Trigger", icon="textures/ui/color_plus", on_click=self.send_add_trigger_form)
         form.add_button("Manage Triggers", icon="textures/ui/settings_glyph_color_2x", on_click=self.send_list_triggers_form)
         form.add_button("Join Sound Settings", icon="textures/ui/sound_glyph_color_2x", on_click=self.send_join_sound_form)
@@ -519,8 +561,13 @@ class EndstoneMusicPlugin(Plugin):
         self.save_config()
         player.send_message(f"{ColorFormat.GREEN}Trigger added! Mode: {mode}, Sound: {sound_choice}, Distance: {data[6]}")
 
-    @event_handler
+    @event_handler(ignore_cancelled=True)
     def on_player_interact(self, event: PlayerInteractEvent):
+        if self.handle_music_interaction(event):
+            return
+        # Legacy triggers remain configured but cannot interfere with a global session.
+        if self.music.session:
+            return
         # Get item name (may be None if no item in hand)
         item_name = ""
         if event.item:
@@ -643,6 +690,9 @@ class EndstoneMusicPlugin(Plugin):
     @event_handler
     def on_player_join(self, event: PlayerJoinEvent):
         player = event.player
+        if self.music.session:
+            player.send_message("Server music is playing; you will join at the next track.")
+            return
         player_name = player.name
         
         # Check for player-specific join sound first
@@ -666,35 +716,67 @@ class EndstoneMusicPlugin(Plugin):
             pitch = join_config.get("pitch", 1.0)
             duration = join_config.get("duration", 15)  # seconds
         
-        # Play sound at player position - audible within 30 blocks
-        pos_x = player.location.x
-        pos_y = player.location.y
-        pos_z = player.location.z
-        
-        # Play sound to all players within 30 blocks of spawn position
-        # Using @a with coordinates but without the name selector issue
-        cmd = f"playsound {sound} @a[x={int(pos_x)},y={int(pos_y)},z={int(pos_z)},r=30] {pos_x} {pos_y} {pos_z} {volume} {pitch}"
-        self.silent_command(cmd)
-        
-        # Also play directly to joining player (in case they're already spawned)
-        try:
-            # Run as server so non-op players can still hear the sound
-            self.silent_command(f"playsound {sound} \"{player_name}\" {pos_x} {pos_y} {pos_z} {volume} {pitch}")
-        except:
-            pass
-        
-        # Schedule stop after configured duration - we'll just stop all sounds for nearby players
-        # Convert seconds to ticks (20 ticks per second)
-        duration_ticks = int(duration * 20)
-        
+        self.stop_custom_sounds_for_player(player_name)
+        player.play_sound(player.location, sound, volume, pitch)
+        self.track_playing_sound(player.name, sound)
+
+        # Stop only this legacy sound, never all sounds or a newer global session.
+        generation = self.legacy_generation
+        sound_token = self.legacy_sound_tokens[player_name]
+        handle = []
         def stop_sound():
+            if handle and handle[0] in self.legacy_join_tasks:
+                self.legacy_join_tasks.remove(handle[0])
+            if generation != self.legacy_generation or self.music.session or self.legacy_sound_tokens.get(player_name) != sound_token:
+                return
             try:
-                stop_cmd = f"stopsound @a[x={int(pos_x)},y={int(pos_y)},z={int(pos_z)},r=30]"
-                self.silent_command(stop_cmd)
-            except:
+                player.stop_sound(sound)
+            except RuntimeError:
                 pass
-        
+        task = self.server.scheduler.run_task(self, stop_sound, delay=max(1, int(duration * 20)))
+        handle.append(task)
+        self.legacy_join_tasks.append(task)
+
+    @event_handler(ignore_cancelled=True)
+    def on_music_block_break(self, event: BlockBreakEvent):
+        if type_id(event.block) != JUKEBOX:
+            return
+        if not self.require_operator(event.player):
+            event.cancel()
+            return
+        # Cleanup observes the actual loaded block on the next periodic tick, so a
+        # later protection listener cancelling this break keeps the binding intact.
+
+    @event_handler
+    def on_music_player_quit(self, event: PlayerQuitEvent):
+        identity = str(event.player.unique_id)
+        self.global_listeners.pop(identity, None)
+        self.music_clicks.pop(identity, None)
+        self.playing_sounds.pop(event.player.name, None)
+        self.legacy_sound_tokens.pop(event.player.name, None)
+
+    def on_disable(self):
+        self.shutdown_music()
+        self.legacy_generation = getattr(self, "legacy_generation", 0) + 1
+        for task in getattr(self, "legacy_join_tasks", []):
+            task.cancel()
+        self.legacy_join_tasks = []
+
+
+# Existing management UI remains available, with permission rechecks on every callback.
+def _guard_legacy_ui(method):
+    from functools import wraps
+    @wraps(method)
+    def guarded(self, player, *args, **kwargs):
+        if not self.require_operator(player):
+            return
         try:
-            self.server.scheduler.run_task(self, stop_sound, duration_ticks)
-        except:
-            pass  # If scheduler doesn't work, sound just plays fully
+            return method(self, player, *args, **kwargs)
+        except (ValueError, TypeError, IndexError, KeyError, AttributeError) as error:
+            player.send_message(f"Invalid or outdated form response: {error}. Reopen the menu.")
+    return guarded
+
+
+for _name in list(vars(EndstoneMusicPlugin)):
+    if _name.startswith(("send_", "handle_", "delete_")):
+        setattr(EndstoneMusicPlugin, _name, _guard_legacy_ui(getattr(EndstoneMusicPlugin, _name)))

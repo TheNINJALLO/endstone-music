@@ -1,193 +1,71 @@
-<!-- endstone-professional-header:start -->
-<p align="center">
-  <img src="docs/assets/banner.svg" width="100%" alt="Endstone Music &mdash; A plugin to trigger custom music on block interaction and auto-generate resource packs">
-</p>
+# Endstone Music 0.2.0
 
-<p align="center">
-  <a href="https://github.com/TheNINJALLO/endstone-music/actions/workflows/wheel-release.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/TheNINJALLO/endstone-music/wheel-release.yml?branch=main&amp;style=for-the-badge&amp;logo=githubactions&amp;logoColor=white&amp;label=Build"></a>
-  <a href="https://github.com/TheNINJALLO/endstone-music/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/TheNINJALLO/endstone-music?display_name=tag&amp;style=for-the-badge&amp;label=Release"></a>
-</p>
+Operator-controlled server-wide music, editable playlists, real custom playlist items and a custom jukebox block. Existing trigger and join-sound configuration remains readable.
 
-<p align="center">
-  <img alt="Endstone 0.11.14" src="https://img.shields.io/badge/Endstone-0.11.14-52b7a8?style=flat-square">
-  <img alt="API 0.11" src="https://img.shields.io/badge/API-0.11-63b8ff?style=flat-square">
-  <img alt="BDS 1.26.52.3" src="https://img.shields.io/badge/BDS-1.26.52.3-8b7dff?style=flat-square">
-  <img alt="Python >=3.11" src="https://img.shields.io/badge/Python-%3E=3.11-3776AB?style=flat-square&amp;logo=python&amp;logoColor=white">
-</p>
+Based on `TheNINJALLO/endstone-music` commit `841b12e5954f10da444b1d1f21cceb7d5163bc9e` (0.1.2). Targets **Endstone 0.11.14 / API 0.11, Python 3.11+, BDS 1.26.52.3** as stated by the original repository. This upgrade has automated local tests and pack checks, but has **not run on a live Endstone/Bedrock server or been audibly tested**. Validate a backed-up test world before production.
 
-<p align="center">
-  <strong>A plugin to trigger custom music on block interaction and auto-generate resource packs.</strong>
-</p>
+## What changed
 
-<p align="center">
-  <a href="#what-it-does">What it does</a> &bull;
-  <a href="#how-to-use">How to use</a> &bull;
-  <a href="#commands-and-permissions">Commands</a> &bull;
-  <a href="#install">Install</a> &bull;
-  <a href="https://github.com/TheNINJALLO/endstone-music/releases">Releases</a>
-</p>
+- A single operator-controlled global playlist session. One sound packet per connected player per track. The resource pack gives each global sound its own `is3D: false, stream: true` definition; no huge radius, artificial high volume, or repeated replay workaround.
+- Ordered persistent playlists: create, edit, reorder, remove tracks, loop, next, stop, and delete. Durations come from FFprobe after conversion, or explicit seconds; timing accounts for pitch. Active sessions use a snapshot, so editing does not disrupt them.
+- A real BP item `endstone_music:playlist_<id>` for each playlist. Identification uses the registered item ID, never a display name or lore. Renaming a vanilla item cannot activate it.
+- A real BP block `endstone_music:jukebox`, its implicit placeable item, RP PNG artwork, English name, and operator interaction menus. Bindings persist by dimension and integer block coordinates. Use a playlist item on it to link, or select a playlist in its menu. Controls are server-wide.
+- Pack generation retains original audio uploads and existing sound definitions, with dedicated global aliases so old proximity triggers remain positional. Stable pack UUIDs, bumped versions, file backups and directory backups.
 
-## Overview
+## Quick start
 
-A plugin to trigger custom music on block interaction and auto-generate resource packs. This release is aligned with Endstone 0.11.14 and Minecraft Bedrock Dedicated Server 1.26.52.3, and is distributed as a Python wheel for direct installation in an Endstone server.
+1. Back up plugin data, the world, its pack directories and pack activation JSON. Install the new wheel following [INSTALL.md](INSTALL.md).
+2. Install **FFmpeg and FFprobe on the server PATH** from a trusted source. Audio generation does not download executables automatically. Python dependencies no longer bundle static-ffmpeg/pydub.
+3. Put audio you have permission to use in `plugins/music/uploads/` (use the actual plugin data folder reported by Endstone; upgraded installs may use `plugins/endstone_music/`). Supported inputs: OGG, MP3, WAV. Use lowercase letters, numbers and underscores for filenames. Spaces/hyphens normalize to underscores; collisions are rejected.
+4. Set the existing `config.json` `target_world_name` to the direct world folder name. Run `/cmusic generate`. This converts audio, records durations and creates/activates BP and RP. Uploads are never deleted. `song.ogg` becomes `custom.song`.
+5. Open `/cmusic` → **Global Music / Playlists** → **Create playlist**. Enter an ID such as `lobby`. Enter ordered tracks as `custom.song; custom.other`, or `custom.song=123.4; custom.other=90` to override durations. Set loop as desired. The list uses semicolons so mobile text fields work.
+6. Run `/cmusic generate` again to create the playlist's custom item definition. Restart the test server and reconnect clients so they download the new packs. New playlist IDs require regeneration and restart; changing track order or loop alone does not.
+7. `/cmusic play lobby` starts it for everyone. `/cmusic give lobby` gives you its playlist item; **use it on an ordinary block** to start. Air use may not fire on all clients for an otherwise inert custom item.
+8. `/cmusic give jukebox` gives you the custom block. Place it, use the playlist item on it to link, then choose **Play for everyone**. Empty-hand use opens its controls. The menu also offers Stop, Next and Unlink.
 
-## What it does
-
-- Plays custom music when configured item, block, or item-and-block interactions occur.
-- Builds a Bedrock resource pack from uploaded OGG, MP3, or WAV audio.
-- Provides form-based trigger creation, trigger management, distance, volume, pitch, broadcast, and message settings.
-
-## How to use
-
-1. Place audio files in the plugin's `uploads/` directory, then run `/cmusic generate`.
-2. Restart the server so clients receive the generated resource pack.
-3. Run `/cmusic`, create a trigger, and select its item/block conditions and sound settings.
-4. Use `/cmusic reload` after supported manual configuration edits.
-
-## Commands and permissions
-
-| Command / usage | What it does | Access |
-|---|---|---|
-| `/cmusic`<br>`/cmusic <reload\|generate\|migrate>` | Manage custom music triggers and resource packs | `endstone_music.command.cmusic` |
-
-## Compatibility
-
-| Component | Supported version |
-|---|---|
-| Endstone | `0.11.14` |
-| Endstone API | `0.11` |
-| Bedrock Dedicated Server | `1.26.52.3` |
-| Python | `>=3.11` |
-| Plugin release | `v0.1.2` |
-
-## Install
-
-Download the wheel from the matching GitHub release:
-
-```bash
-gh release download v0.1.2 --repo TheNINJALLO/endstone-music --pattern "*.whl"
-```
-
-Copy the downloaded wheel into the server's `plugins/` directory, remove any older wheel for the same plugin, and restart Endstone.
-
-> [!IMPORTANT]
-> Use Endstone `0.11.14` with BDS `1.26.52.3`. Back up worlds and plugin data before upgrading a production server.
-
-## Configuration and secrets
-
-Runtime databases, logs, local `.env` files, server directories, and root `config.toml` files are excluded from source releases. When an example configuration is provided, copy it locally and keep live tokens, passwords, webhook URLs, and server identifiers out of Git.
-
-## Release automation
-
-Every `v*` tag runs [the wheel release workflow](.github/workflows/wheel-release.yml), builds the package in a clean GitHub runner, stores the wheel as a workflow artifact, and attaches it to the matching GitHub release.
-<!-- endstone-professional-header:end -->
-
----
-
-## Project guide
-
-A powerful custom music plugin for Endstone Bedrock servers that allows operators to trigger custom sounds when players interact with blocks or items.
-
-## Features
-
-- **Custom Sound Triggers**: Three trigger modes:
-  - **Item + Block**: Sound when specific item is used on specific block
-  - **Item Only**: Sound when clicking anywhere with specific item (follows player)
-  - **Block Only**: Sound when clicking specific block with any item
-- **Automated Resource Pack Generation**: 
-  - Drop `.ogg`, `.mp3`, or `.wav` files into the `uploads` folder
-  - Automatic conversion to Bedrock-compatible format (Stereo, 44.1kHz)
-  - Auto-installs to your world's resource_packs folder
-  - Version auto-bumps on each generation
-- **In-Game Configuration UI**: Add, view, and delete triggers via forms
-- **Distance-Based Audio**: Configure audible range (100 - 1,000,000 blocks)
-- **Broadcast Mode**: Play sounds to all nearby players
-- **Stops Overlapping Sounds**: New triggers automatically stop previous sounds
-
-## Installation
-
-1. Build or download the plugin wheel
-2. Place in your Endstone `plugins` folder
-3. Start the server
+All music management, new item activation, jukebox controls, and jukebox breaking require `endstone_music.command.cmusic` (default `op`). Administrators can explicitly grant this permission; possessing or copying an item alone grants no control. Custom items are an identifier mechanism, not cryptographic inventory ownership.
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `/cmusic` | Open the in-game configuration menu |
-| `/cmusic generate` | Generate resource pack from uploaded audio |
-| `/cmusic reload` | Reload config without restart |
+- `/cmusic`: existing management menu plus Global Music / Playlists
+- `/cmusic playlists`: playlist menu (console: list IDs)
+- `/cmusic play <id>`, `/cmusic stop`, `/cmusic next`, `/cmusic status`
+- `/cmusic playlist create <id>`
+- `/cmusic playlist add <id> <sound> [seconds]` (duration can be omitted after generation)
+- `/cmusic playlist remove <id> <track-number>`
+- `/cmusic playlist move <id> <from-number> <to-number>` (1-based)
+- `/cmusic playlist loop <id> on|off`
+- `/cmusic playlist delete <id>` (also removes its jukebox bindings and stops that playlist)
+- `/cmusic give <id|jukebox>` (player only; requires generated/loaded custom IDs)
+- `/cmusic reload`: validates configuration, stops active global playback, cancels pending join stops, then applies it. Invalid JSON leaves active in-memory playback untouched.
+- `/cmusic generate`: builds audio and both packs, updates world activation lists with backups; restart/reconnect afterward
+- `/cmusic migrate`: directs legacy installations to generate, which adds the required global aliases
 
-## Usage
+## Session behavior and limitations
 
-### Adding Custom Sounds
+Global music uses only generated pack sounds, not unverified vanilla sound IDs. Existing standalone triggers retain their previous configuration. While a global session is active, legacy triggers and join sounds are suppressed so they cannot replace the operator's session. Outside a global session, legacy triggers work as before. Legacy join sounds are now played only to the joining player and stopped by exact sound name, preventing the old nearby-all-sounds stop from disrupting other audio.
 
-1. **Upload audio** to `plugins/endstone_music/uploads/`
-   - Supports: `.ogg`, `.mp3`, `.wav`
-   - MP3/WAV auto-convert and delete after conversion
+Late joiners **wait for the next track**. Endstone's sound API has no seek/offset support; it cannot accurately synchronize a client into the middle of an OGG. A single-track non-looping playlist therefore gives late joiners no audio until the next explicit start. Disconnecting removes that client's tracking. A session continues its bounded track schedule with zero players; looping continues until Stop, reload or disable. No auto-resume occurs after restart.
 
-2. **Generate pack**: `/cmusic generate`
+A jukebox starts the same server-wide channel; a second start replaces the previous session. Bindings distinguish dimensions. The plugin checks loaded chunks once per second without force-loading them. Removing/replacing a bound block cleans its binding and stops only a session owned by it; unloading its chunk stops its session but retains the binding. A stale form cannot play or link a removed/unloaded block. A player cannot break the custom block without the operator permission. Other plugins, explosions, commands and chunk unloads are detected on the periodic check. A block removed and replaced at the same coordinates between checks may retain its binding; verify administrative world edits explicitly. The block is marked immovable by pistons.
 
-3. **Restart server** to apply the resource pack
+Volume/pitch defaults are 1.0. Advanced `playlists.json` per-track settings support volume 0–1 and pitch 0.5–2, with finite durations 0.05–86400 seconds. The mobile editor preserves settings by matching sound ID; duplicate occurrences of the same sound reuse that sound's first existing volume/pitch. Use JSON for distinct settings on duplicates. Track end uses wall-clock duration checked every server tick, not sample-perfect synchronization; lag can delay a transition. Client pack acceptance, volume slider, music behavior and audible continuity across dimensions need real Bedrock validation.
 
-### Adding Triggers (In-Game)
+## Files and safe migration
 
-1. Run `/cmusic` → **Add New Trigger**
-2. Configure:
-   - **Trigger Mode**: Item+Block, Item Only, or Block Only
-   - **Item/Block**: Minecraft IDs
-   - **Sound**: Select from dropdown
-   - **Volume/Pitch**: Adjust playback
-   - **Distance**: Audible range (100 - 1,000,000 blocks)
-   - **Broadcast**: Play to all nearby players
-   - **Loop**: Loop the sound (saved for future use)
-   - **Message**: Optional chat message
+`config.json` is not rewritten merely to add playlists; old triggers and unknown keys are retained. The new `playlists.json` stores schema-versioned playlists and jukebox bindings. `track_durations.json`, `sounds_registry.json` and `global_sounds_registry.json` are generated data. `pack_metadata.json` preserves existing RP UUIDs and adds BP UUIDs. JSON updates keep `.bak`; generated pack directories keep `.backup`. Each new backup replaces the prior backup, so keep an independent backup before every upgrade/generation. No world blocks are placed automatically.
 
-### Managing Triggers
+Do not use symlinks in upload/pack paths or a symlink target world. Invalid/malformed pack activation JSON is rejected rather than erased. Staging and directory swaps protect each pack, but the entire multi-file generation/install is not one filesystem transaction; after any I/O failure inspect backups before restarting.
 
-1. Run `/cmusic` → **Manage Triggers**
-2. Select a trigger to view details
-3. Delete triggers you no longer need
+## Offline build and test
 
-## Configuration
+From this source directory:
 
-Edit `plugins/endstone_music/config.json`:
-
-```json
-{
-  "pack_name": "My Server Music",
-  "target_world_name": "Bedrock level",
-  "triggers": [
-    {
-      "mode": "block_only",
-      "item": "minecraft:stick",
-      "block": "minecraft:jukebox",
-      "sound": "custom.mysong",
-      "volume": 1.0,
-      "pitch": 1.0,
-      "distance": 1000,
-      "broadcast": true,
-      "loop": false,
-      "message": "§aNow playing: My Song"
-    }
-  ]
-}
+```sh
+python run_tests.py
+python -m compileall -q src
+python -c 'from setuptools.build_meta import build_wheel; build_wheel("dist")'
+PYTHONPATH=src python -m endstone_music.pack_generator --data ./offline_data --uploads ./uploads --output ./generated --playlists ./playlists.json
 ```
 
-## Sound Naming
-
-- `mysong.ogg` → `custom.mysong`
-- `epic_battle.mp3` → `custom.epic_battle`
-
-## Dependencies
-
-- **pydub**: Audio processing
-- **static-ffmpeg**: Bundled FFmpeg (no system install needed)
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Pack not loading | Check `target_world_name` matches your world folder |
-| No sound in-game | Ensure clients downloaded the pack |
-| Triggers not working | Run `/cmusic reload` |
+The offline generator writes both pack directories and metadata only; it does not activate a world. No copyrighted music is included. The supplied template packs contain an empty `lobby` playlist item and the jukebox for inspection; regenerate with your own metadata/audio/config before use. See [VALIDATION.md](VALIDATION.md) for what was and was not tested.
