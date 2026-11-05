@@ -1,4 +1,13 @@
-# 0.2.0 development build
+# 0.2.1
+
+- Add follow-player single-track and album discs, persistent insert/eject and configurable per-block jukebox presets.
+- Add the Endstone 0.11.15 native sound boundary and scoped protocol-2225 playback-position adapter for BDS 1.26.60.6.
+- Preserve operator global playlists, custom content generation, existing playlist stores, bindings, pack UUIDs and installed pack entries from 0.2.0.
+- Share one playback voice per listener; prevent join/legacy triggers interrupting global music and keep pushed albums through movement, chunk unloading and dimension changes.
+- Convert stereo/spatial OGG in a background worker using installed FFmpeg; retain uploads and roll back RP/BP and metadata on publication failure.
+- Add native API, playback, disc storage, migration and custom-content checks and a Linux acceptance checklist.
+
+# 0.2.0
 
 - Add ordered persistent playlists and server-wide operator playback with generated non-spatial streamed sound aliases.
 - Add editable mobile-friendly playlist forms, console edits, loop/next/stop/status and generated custom playlist items.

@@ -1,0 +1,55 @@
+{
+  "platform": "windows",
+  "bds_package": "1.26.60.6",
+  "archive_sha256": "21620db4f80d0fe206f21cb08f52f4e5f14252ce865ec49ccfbe0d9f93ce88b0",
+  "executable_sha256": "d7b26d6c5e8f3e910f66e8cbf7e1dfde06e570032349bf7abdd070deb6e9d884",
+  "executable_size": 232647024,
+  "strings": {
+    "JukeboxBlock": {
+      "count": 4,
+      "sample_file_offsets": [
+        222732144,
+        222732297,
+        222732400,
+        222732571
+      ]
+    },
+    "JukeboxBlockActor": {
+      "count": 0,
+      "sample_file_offsets": []
+    },
+    "RecordItem": {
+      "count": 7,
+      "sample_file_offsets": [
+        185718527,
+        186077789,
+        186077887,
+        186077962,
+        186606106,
+        186606196,
+        186606309
+      ]
+    },
+    "PlaySoundPacket": {
+      "count": 4,
+      "sample_file_offsets": [
+        185500051,
+        185931616,
+        186144106,
+        186404340
+      ]
+    },
+    "StopSoundPacket": {
+      "count": 3,
+      "sample_file_offsets": [
+        185500067,
+        186144177,
+        186404418
+      ]
+    }
+  },
+  "note": "String offsets identify evidence only; they are not callable function addresses or ABI layouts.",
+  "private_memory_hooks": false,
+  "connected_client_tested": false,
+  "checked_date": "2026-11-04"
+}

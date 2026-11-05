@@ -1,4 +1,21 @@
-# Validation record
+# Music 0.2.1 validation
+
+Date: 2026-11-04. Local host: Windows x86-64, Python 3.11.9, native Endstone 0.11.15 SDK. Target: Linux x86-64, BDS 1.26.60.6, protocol 2225.
+
+- python run_tests.py: 97 tests; 95 passed locally and two symlink checks skipped because this Windows account cannot create symlinks. Both execute in the Linux release workflow.
+- Coverage includes the previous 0.2.0 playlist/control/custom-content checks, native event/NBT signatures, scoped packet adaptation, real stereo/mono FFmpeg conversion, follow-player albums, late global listeners, persistence, pack migration and failure rollback.
+- python -m compileall -q src tests tools and wheel/bundle integrity checks are part of packaging.
+- Official Linux and Windows BDS package identities and executable hashes are recorded in compatibility/.
+
+No live Linux server startup, outbound server packet capture, connected Bedrock client or audible playback test has been completed. See docs/ACCEPTANCE.md for qualification. Automated success does not certify in-game audio or content registration.
+
+The release workflow reruns all suites on Linux before publishing the wheel, setup bundle and artifact checksums. See the workflow result for its authoritative CI outcome.
+
+## Historical 0.2.0 development validation
+
+The following is the prior release's historical record; its environment, deployment statements and late-join behavior describe 0.2.0.
+
+### Prior validation record
 
 Date: 2026-10-13 UTC. Local Python 3.12. Target Python minimum: 3.11.
 

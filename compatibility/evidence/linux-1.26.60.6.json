@@ -1,0 +1,71 @@
+{
+  "platform": "linux",
+  "bds_package": "1.26.60.6",
+  "archive_sha256": "cbbd5414fa6a310353ed1fc76a0ba691c3fd1ea852fd04bb76764ee4c1afdb98",
+  "executable_sha256": "ea16b541a448e07c337848d2c5f37321b706554b5216dd942f3f11e7a8ed2bad",
+  "executable_size": 265500280,
+  "strings": {
+    "JukeboxBlock": {
+      "count": 7,
+      "sample_file_offsets": [
+        21584903,
+        29602644,
+        29603241,
+        29603420,
+        29603632,
+        29603820,
+        30022516
+      ]
+    },
+    "JukeboxBlockActor": {
+      "count": 2,
+      "sample_file_offsets": [
+        21584903,
+        30022516
+      ]
+    },
+    "RecordItem": {
+      "count": 22,
+      "sample_file_offsets": [
+        19452709,
+        19730753,
+        19732609,
+        20016354,
+        20097349,
+        20204599,
+        20551373,
+        29364796
+      ]
+    },
+    "PlaySoundPacket": {
+      "count": 11,
+      "sample_file_offsets": [
+        18695535,
+        18695613,
+        19049133,
+        20146475,
+        25056072,
+        25061447,
+        25061504,
+        25061559
+      ]
+    },
+    "StopSoundPacket": {
+      "count": 10,
+      "sample_file_offsets": [
+        18870633,
+        19693289,
+        20792708,
+        25000537,
+        25013243,
+        25013300,
+        25013355,
+        25013410
+      ]
+    }
+  },
+  "note": "String offsets identify evidence only; they are not callable function addresses or ABI layouts.",
+  "private_memory_hooks": false,
+  "connected_client_tested": false,
+  "checked_date": "2026-11-04"
+}

@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-04",
+  "target": "Linux x86-64 / BDS 1.26.60.6 / Endstone 0.11.15 / protocol 2225",
+  "test_host": "Windows x86-64 / Python 3.11.9",
+  "native_api_tested": "Endstone 0.11.15 cp311 win_amd64",
+  "command": "python run_tests.py",
+  "tests_run": 97,
+  "tests_passed": 95,
+  "follow_player_and_album_completion_tested": true,
+  "real_ffmpeg_conversion_tested": true,
+  "native_nbt_and_event_contracts_tested": true,
+  "official_linux_server_files_verified": true,
+  "official_windows_server_files_verified": true,
+  "live_linux_server_tested": false,
+  "outbound_server_packet_capture_tested": false,
+  "connected_client_tested": false,
+  "audible_playback_verified": false,
+  "acceptance_checklist": "docs/ACCEPTANCE.md",
+  "tests_skipped": 2,
+  "skipped_reason": "Windows symlink privilege unavailable; symlink checks execute in Linux GitHub Actions",
+  "upstream_020_global_playlist_and_custom_content_preserved": true
+}

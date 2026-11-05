@@ -1,3 +1,5 @@
+For the 0.2.1 / Endstone 0.11.15 / protocol-2225 adapter, see [ABI_ADAPTER.md](ABI_ADAPTER.md). The following API evidence was retained from 0.2.0 and describes its earlier 0.11.14 boundary.
+
 # Endstone Music API evidence
 
 Checked 2026-10-13. Repository baseline: TheNINJALLO/endstone-music `841b12e5954f10da444b1d1f21cceb7d5163bc9e`. Endstone source pinned to `v0.11.14` (`03f4189b1535af0870861748fc569f6deac0ad65`). No live server/client was tested.

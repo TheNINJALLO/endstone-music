@@ -7,6 +7,7 @@ from endstone.form import ActionForm, ModalForm, TextInput, Toggle
 from endstone.inventory import ItemStack
 from endstone_music.playlists import PlaylistStore, Playback
 from endstone_music.pack_generator import GLOBAL_PREFIX
+from endstone_music.library import Track
 
 PERMISSION = "endstone_music.command.cmusic"
 JUKEBOX = "endstone_music:jukebox"
@@ -28,7 +29,6 @@ class MusicControls:
         self.music = Playback(self._play_global, self._stop_global)
         self.music_clicks = {}
         self.music_tick_count = 0
-        self.music_task = self.server.scheduler.run_task(self, self._music_tick, delay=1, period=1)
 
     def require_operator(self, sender):
         if not sender.has_permission(PERMISSION):
@@ -37,36 +37,25 @@ class MusicControls:
         return True
 
     def _play_global(self, track):
-        self.legacy_generation += 1
-        for task in self.legacy_join_tasks:
-            task.cancel()
-        self.legacy_join_tasks.clear()
-        self.global_listeners = {}
+        self._join_sessions.clear()
         sound = GLOBAL_PREFIX + track["sound"]
-        for player in self.server.online_players:
-            self.stop_custom_sounds_for_player(player.name)
-            player.play_sound(player.location, sound, track.get("volume", 1.0), track.get("pitch", 1.0))
-            self.global_listeners[str(player.unique_id)] = player
+        self.playback.start("operator:global", (Track(sound, sound, track["duration"]),), listener="*",
+                            volume=track.get("volume", 1.0), pitch=track.get("pitch", 1.0))
+        self.playback.tick()
 
     def _stop_global(self, sound):
-        # Only the alias this session owns; no wildcard/category/global music stop.
-        for player in list(self.global_listeners.values()):
-            try:
-                player.stop_sound(GLOBAL_PREFIX + sound)
-            except RuntimeError:
-                pass  # Player disconnected before stop.
-        self.global_listeners.clear()
+        self.playback.stop("operator:global")
 
-    def _music_tick(self):
+    def _operator_tick(self):
         try:
-            self.music_tick_count += 1
+            self.music_tick_count += 5
             if self.music_tick_count % 20 == 0:
                 # Enumerate loaded chunks before block lookup; never load a chunk for music.
                 for key in list(self.playlists.data["jukeboxes"]):
                     state = self.jukebox_state(key)
                     if state == "missing":
                         self.playlists.unbind(key)
-                    if state != "present" and self.music.session and self.music.session["source"] == key:
+                    if state == "missing" and self.music.session and self.music.session["source"] == key:
                         self.music.stop()
             self.music.tick()
         except Exception as error:
@@ -74,8 +63,6 @@ class MusicControls:
             self.logger.error(f"Global playback stopped: {error}")
 
     def shutdown_music(self):
-        if hasattr(self, "music_task"):
-            self.music_task.cancel()
         if hasattr(self, "music"):
             self.music.stop()
         if hasattr(self, "music_clicks"):
@@ -97,7 +84,7 @@ class MusicControls:
             if track["sound"] not in registered or track["sound"] not in safe:
                 raise ValueError(f"Generate the resource pack before playing {track['sound']}; global playback needs its 2D alias")
         self.music.start(name, playlist, source)
-        sender.send_message(f"Playing {name} for everyone. Late joiners enter at the next track.")
+        sender.send_message(f"Playing {name} for everyone. Late joiners enter at the current track position.")
 
     def music_command(self, sender, args):
         action = args[0].lower()
@@ -181,7 +168,7 @@ class MusicControls:
     def send_playlists_menu(self, player):
         if not self.require_operator(player):
             return
-        form = ActionForm(title="Global Music", content="Operator-only • all players • no distance fading with generated pack. Late joins wait for next track.")
+        form = ActionForm(title="Global Music", content="Operator-only • all players • no distance fading with generated pack. Late joins enter at the current position.")
         form.add_button("Create playlist", on_click=lambda p: self.send_playlist_editor(p))
         form.add_button("Stop global music", on_click=lambda p: self.music_command(p, ["stop"]))
         form.add_button("Next track", on_click=lambda p: self.music_command(p, ["next"]))
@@ -304,7 +291,10 @@ class MusicControls:
             return "unloaded"
         if not any(chunk.x == x // 16 and chunk.z == z // 16 for chunk in dimension.loaded_chunks):
             return "unloaded"
-        return "present" if type_id(dimension.get_block_at(x, y, z)) == JUKEBOX else "missing"
+        try:
+            return "present" if type_id(dimension.get_block_at(x, y, z)) == JUKEBOX else "missing"
+        except RuntimeError:
+            return "unloaded"
 
     def unbind_jukebox(self, player, key):
         if not self.require_operator(player):

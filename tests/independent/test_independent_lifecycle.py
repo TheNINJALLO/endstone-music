@@ -1,37 +1,84 @@
-import test_independent_controls as base
-import sys,types,tempfile,pathlib,unittest,json
+"""Lifecycle regressions use the real Endstone 0.11.15 API test harness."""
+import json
+import sys
+import types
+import unittest
+from pathlib import Path
 from unittest.mock import Mock
-endstone=sys.modules['endstone'];endstone.ColorFormat=types.SimpleNamespace(RED='',GREEN='',YELLOW='',GRAY='')
-forms=sys.modules['endstone.form']
-for name in ['Dropdown','Slider']:setattr(forms,name,base.Form)
-events=sys.modules['endstone.event']
-def event_handler(f=None,**kw):
- def dec(fn):fn.event_options=kw;return fn
- return dec(f) if f else dec
-events.event_handler=event_handler;events.EventPriority=types.SimpleNamespace(MONITOR=5,HIGHEST=4)
-for name in ['PlayerJoinEvent','PlayerQuitEvent','BlockBreakEvent']:setattr(events,name,type(name,(),{}))
-plugin=types.ModuleType('endstone.plugin');plugin.Plugin=object;sys.modules['endstone.plugin']=plugin
-command=types.ModuleType('endstone.command');command.Command=object;command.CommandSender=object;sys.modules['endstone.command']=command
-from endstone_music.plugin import EndstoneMusicPlugin
-from endstone_music.playlists import Playback,PlaylistStore
-class Task:
- def __init__(self,callback):self.callback=callback;self.cancelled=False
- def cancel(self):self.cancelled=True
-class Scheduler:
- def __init__(self):self.tasks=[]
- def run_task(self,owner,callback,delay=0,period=0):
-  task=Task(callback);self.tasks.append(task);return task
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import test_runtime
+from test_music import FakeItem, FakePlayer
+from endstone.event import PlayerInteractEvent
+
 class Lifecycle(unittest.TestCase):
- def setUp(self):
-  self.tmp=tempfile.TemporaryDirectory();self.root=pathlib.Path(self.tmp.name);self.p=EndstoneMusicPlugin();p=self.p;p.data_path=self.root;p.cmusic_config_file=self.root/'config.json';p.cmusic_config={'triggers':[],'join_sound':{'enabled':True,'sound':'custom.join','duration':2}};p.cmusic_config_file.write_text(json.dumps(p.cmusic_config));p.playing_sounds={};p.legacy_join_tasks=[];p.legacy_generation=0;p.server=types.SimpleNamespace(scheduler=Scheduler(),online_players=[],dispatch_command=Mock(),command_sender=object());p.logger=Mock();p.setup_music();self.op=base.Player();p.get_available_sounds=lambda:['custom.a'];p.playlists.put('party',[{'sound':'custom.a','duration':2}],True);(self.root/'global_sounds_registry.json').write_text('["custom.a"]')
- def tearDown(self):self.tmp.cleanup()
- def test_pending_join_stop_does_not_interrupt_global(self):
-  p=self.p;p.on_player_join(types.SimpleNamespace(player=self.op));callback=p.legacy_join_tasks[0].callback;p.server.online_players=[self.op];p.start_playlist(self.op,'party');prior=list(self.op.sounds);callback();self.assertEqual(self.op.sounds,prior)
- def test_legacy_trigger_does_not_interrupt_global(self):
-  p=self.p;p.start_playlist(self.op,'party');event=base.Event(base.Player(False),types.SimpleNamespace(type=types.SimpleNamespace(id='minecraft:stick')),types.SimpleNamespace(type='minecraft:grass_block'));p.on_player_interact(event);p.server.dispatch_command.assert_not_called();self.assertIsNotNone(p.music.session)
- def test_disable_cancels_scheduler_and_join_callbacks(self):
-  p=self.p;p.on_player_join(types.SimpleNamespace(player=self.op));p.server.online_players=[self.op];p.start_playlist(self.op,'party');p.on_disable();self.assertIsNone(p.music.session);self.assertTrue(all(t.cancelled for t in p.server.scheduler.tasks));self.assertEqual(p.legacy_join_tasks,[])
- def test_reload_valid_stops_invalid_keeps(self):
-  p=self.p;p.start_playlist(self.op,'party');command=types.SimpleNamespace(name='cmusic');p.cmusic_config_file.write_text('{bad');p.on_command(self.op,command,['reload']);self.assertIsNotNone(p.music.session)
-  p.cmusic_config_file.write_text('{"triggers":[]}');p.on_command(self.op,command,['reload']);self.assertIsNone(p.music.session)
-if __name__=='__main__':unittest.main(verbosity=2)
+    def setUp(self):
+        test_runtime.RuntimeTests.setUp(self)
+        self.plugin.on_enable()
+        self.plugin.playlists.put("party", [{"sound": "custom.a", "duration": 2}], True)
+        (self.plugin.data_path / "global_sounds_registry.json").write_text('["custom.a"]')
+        self.player.has_permission = lambda permission: True
+        self.player.send_message = Mock()
+
+    def start(self):
+        self.plugin.start_playlist(self.player, "party")
+
+    def test_pending_join_cannot_interrupt_global(self):
+        self.plugin._join_music(self.player)
+        self.start()
+        before = list(self.player.calls)
+        self.scheduler.advance(20)
+        self.assertEqual(self.player.calls, before)
+        self.assertIsNotNone(self.plugin.music.session)
+
+    def test_legacy_trigger_does_not_interrupt_global(self):
+        self.start()
+        self.plugin.cmusic_config["triggers"] = [{"mode": "item_only", "item": "minecraft:stick", "sound": "custom.a"}]
+        self.plugin._interact_music(types.SimpleNamespace(player=self.player, item=FakeItem("minecraft:stick"),
+            block=None, action=PlayerInteractEvent.Action.RIGHT_CLICK_AIR))
+        self.assertEqual(set(self.plugin.playback.sources), {"operator:global"})
+
+    def test_disable_stops_global_and_invalidates_pending_join(self):
+        self.plugin._join_music(self.player)
+        self.start()
+        self.plugin.on_disable()
+        before = list(self.player.calls)
+        self.scheduler.advance(40)
+        self.assertEqual(self.player.calls, before)
+        self.assertIsNone(self.plugin.music.session)
+        self.assertFalse(self.plugin.playback.sources)
+
+    def test_reload_valid_stops_invalid_keeps_global(self):
+        self.start()
+        self.plugin.cmusic_config_file.write_text("{bad")
+        self.plugin.on_command(self.player, types.SimpleNamespace(name="cmusic"), ["reload"])
+        self.assertIsNotNone(self.plugin.music.session)
+        self.plugin.cmusic_config_file.write_text(json.dumps(self.config))
+        self.plugin.on_command(self.player, types.SimpleNamespace(name="cmusic"), ["reload"])
+        self.assertIsNone(self.plugin.music.session)
+
+    def test_global_late_listener_seeks_without_restarting_existing_listener(self):
+        clock = [0.0]
+        self.plugin.playback.clock = self.plugin.music.clock = lambda: clock[0]
+        self.plugin.audio_adapter.play = Mock(wraps=self.plugin.audio_adapter.play)
+        self.start()
+        before = list(self.player.calls)
+        second = FakePlayer("Late", "nether", x=10000)
+        self.server.online_players.append(second)
+        clock[0] = 0.5
+        self.plugin._music_tick()
+        self.assertEqual(self.player.calls, before)
+        call = self.plugin.audio_adapter.play.call_args
+        self.assertIs(call.args[0], second)
+        self.assertEqual(call.args[2], "endstone_music.global.custom.a")
+        self.assertEqual(call.kwargs["position_seconds"], 0.5)
+
+    def test_revoked_operator_cannot_stop_from_runtime_menu(self):
+        self.start()
+        self.player.has_permission = lambda permission: False
+        self.plugin._runtime_command(self.player, ["stop"])
+        self.assertIsNotNone(self.plugin.music.session)
+        self.assertIn("operator:global", self.plugin.playback.sources)
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

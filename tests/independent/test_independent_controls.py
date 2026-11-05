@@ -4,7 +4,7 @@ ROOT=pathlib.Path(__file__).resolve().parents[2]
 pkg=types.ModuleType('endstone_music');pkg.__path__=[str(ROOT/'src/endstone_music')];sys.modules['endstone_music']=pkg
 endstone=types.ModuleType('endstone')
 class Player:
- def __init__(self,op=True):self.name='Tester';self.unique_id='test-id';self.location=object();self.op=op;self.messages=[];self.sounds=[];self.forms=[]
+ def __init__(self,op=True):self.name='Tester';self.unique_id='test-id';self.location=types.SimpleNamespace(dimension=types.SimpleNamespace(name='overworld'),x=0,y=0,z=0);self.op=op;self.messages=[];self.sounds=[];self.forms=[]
  def has_permission(self,p):return self.op
  def send_message(self,m):self.messages.append(m)
  def play_sound(self,*a):self.sounds.append(('play',a))
@@ -26,9 +26,14 @@ class Event:
 events.PlayerInteractEvent=Event;sys.modules['endstone.event']=events
 from endstone_music.music_controls import MusicControls,JUKEBOX,ITEM_PREFIX
 from endstone_music.playlists import PlaylistStore,Playback
+from endstone_music.playback import PlaybackEngine
+class Adapter:
+ def require_supported(self):pass
+ def play(self,player,origin,sound,volume,pitch,**kw):player.play_sound(origin,sound,volume,pitch)
+ def stop(self,player,sound):player.stop_sound(sound)
 class Controls(MusicControls):
  def __init__(self,path):
-  self.legacy_generation=0;self.legacy_join_tasks=[];self.data_path=path;self.playlists=PlaylistStore(path/'playlists.json');self.music=Playback(self._play_global,self._stop_global);self.music_clicks={};self.global_listeners={};self.server=types.SimpleNamespace(online_players=[]);self.stopped=[]
+  self._join_sessions={};self.data_path=path;self.playlists=PlaylistStore(path/'playlists.json');self.music=Playback(self._play_global,self._stop_global);self.music_clicks={};self.global_listeners={};self.server=types.SimpleNamespace(online_players=[]);self.stopped=[];self.logger=Mock();self.playback=PlaybackEngine(self.server,Adapter(),self.logger)
  def stop_custom_sounds_for_player(self,name):self.stopped.append(name)
  def get_available_sounds(self):return ['custom.a']
 class IndependentControls(unittest.TestCase):
@@ -54,8 +59,8 @@ class IndependentControls(unittest.TestCase):
   key='["overworld",1,2,3]';self.c.playlists.bind(key,'party');self.c.jukebox_state=lambda key:'present';self.c.start_playlist(self.op,'party',key);self.c.unbind_jukebox(self.op,key);self.assertIsNone(self.c.music.session);self.assertEqual(self.c.playlists.data['jukeboxes'],{})
  def test_loaded_missing_cleanup_and_unloaded_preservation(self):
   key='["overworld",1,2,3]';self.c.playlists.bind(key,'party');self.c.jukebox_state=lambda key:'present';self.c.start_playlist(self.op,'party',key)
-  self.c.music_tick_count=19;self.c.jukebox_state=lambda key:'unloaded';self.c._music_tick();self.assertIsNone(self.c.music.session);self.assertIn(key,self.c.playlists.data['jukeboxes'])
-  self.c.music_tick_count=19;self.c.jukebox_state=lambda key:'missing';self.c._music_tick();self.assertNotIn(key,self.c.playlists.data['jukeboxes'])
+  self.c.music_tick_count=15;self.c.jukebox_state=lambda key:'unloaded';self.c._operator_tick();self.assertIsNotNone(self.c.music.session);self.assertIn(key,self.c.playlists.data['jukeboxes'])
+  self.c.music_tick_count=15;self.c.jukebox_state=lambda key:'missing';self.c._operator_tick();self.assertNotIn(key,self.c.playlists.data['jukeboxes']);self.assertIsNone(self.c.music.session)
  def test_nonop_commands_do_not_mutate(self):
   for args in [['play','party'],['stop'],['next'],['playlist','delete','party']]:self.assertTrue(self.c.music_command(self.normal,args))
   self.assertIsNone(self.c.music.session);self.assertIn('party',self.c.playlists.data['playlists'])

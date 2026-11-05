@@ -1,0 +1,23 @@
+{
+  "pack_name": "My Server Music",
+  "target_world_name": "Bedrock level",
+  "join_sound": {"enabled": false},
+  "player_join_sounds": {},
+  "triggers": [],
+  "tracks": {
+    "intro": {"sound": "custom.intro", "duration": 60, "title": "Intro"},
+    "main": {"sound": "custom.main", "duration": 180, "title": "Main Track"}
+  },
+  "discs": {
+    "intro_single": {"title": "Intro Single", "track": "intro", "item": "minecraft:music_disc_cat"}
+  },
+  "albums": {
+    "server_album": {"title": "Server Album", "tracks": ["intro", "main"], "loop": true, "item": "minecraft:music_disc_13"}
+  },
+  "jukeboxes": {
+    "default": {"block": "minecraft:jukebox", "radius": 32, "volume": 1.0, "pitch": 1.0, "follow_player": true},
+    "lounge": {"block": "minecraft:jukebox", "radius": 12, "volume": 0.7, "pitch": 1.0, "follow_player": false},
+    "speaker": {"block": "minecraft:noteblock", "radius": 48, "volume": 1.0, "pitch": 1.0, "follow_player": true}
+  },
+  "jukebox_bindings": {}
+}
