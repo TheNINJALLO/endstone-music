@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="340" viewBox="0 0 1200 340" role="img" aria-labelledby="title description">
   <title id="title">Endstone Music</title>
-  <desc id="description">A plugin to trigger custom music on block interaction and auto-generate resource packs.</desc>
+  <desc id="description">Album discs, follow-player audio, global playlists and custom jukeboxes.</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#07141a"/>
@@ -44,14 +44,14 @@
   <g font-family="Inter, Segoe UI, Arial, sans-serif">
     <text x="350" y="107" fill="#9fc8d4" font-size="19" font-weight="650" letter-spacing="4">ENDSTONE &#8226; PYTHON PLUGIN</text>
     <text x="346" y="168" fill="#f5fbff" font-size="52" font-weight="760" letter-spacing="-1.3">Music</text>
-    <text x="350" y="210" fill="#c0d4df" font-size="19">A plugin to trigger custom music on block interaction and auto-generate resource packs</text>
+    <text x="350" y="210" fill="#c0d4df" font-size="19">Album discs, follow-player audio, global playlists and custom jukeboxes</text>
     <g transform="translate(350 247)" font-size="15" font-weight="650">
       <rect width="174" height="36" rx="18" fill="#52e5d1" fill-opacity="0.11" stroke="#52e5d1" stroke-opacity="0.44"/>
       <text x="87" y="23" text-anchor="middle" fill="#82efe0">Endstone 0.11.15</text>
       <rect x="188" width="154" height="36" rx="18" fill="#63b8ff" fill-opacity="0.11" stroke="#63b8ff" stroke-opacity="0.44"/>
       <text x="265" y="23" text-anchor="middle" fill="#9bd0ff">BDS 1.26.60.6</text>
       <rect x="356" width="132" height="36" rx="18" fill="#f2b84b" fill-opacity="0.1" stroke="#f2b84b" stroke-opacity="0.42"/>
-      <text x="422" y="23" text-anchor="middle" fill="#ffd27a">v0.1.1</text>
+      <text x="422" y="23" text-anchor="middle" fill="#ffd27a">v0.2.1</text>
     </g>
   </g>
 
