@@ -14,7 +14,7 @@ from endstone_music.music_controls import MusicControls
 from endstone_music.library import atomic_json
 
 class EndstoneMusicPlugin(MusicRuntime, MusicControls, Plugin):
-    version = "0.2.1"
+    version = "0.2.2"
     api_version = "0.11"
     
     commands = {
@@ -40,7 +40,7 @@ class EndstoneMusicPlugin(MusicRuntime, MusicControls, Plugin):
         self.upload_dir.mkdir(exist_ok=True)
         self.cmusic_config_file = self.data_path / "config.json"
         self.load_config()
-        self.generator = PackGenerator(data_path=self.data_path)
+        self.generator = PackGenerator(data_path=self.data_path, logger=self.logger)
         self._enable_music()
         self.register_events(self)
 

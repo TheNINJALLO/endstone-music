@@ -1,24 +1,26 @@
-# Music 0.2.1 - Install, upgrade and roll back
+# Music 0.2.2 - Install, upgrade and roll back
 
 [README](README.md) | [Complete how-to](HOW-TO-USE.md) | [Live server checks](docs/ACCEPTANCE.md)
 
-Target: Linux x86-64, Endstone **0.11.15**, BDS **1.26.60.6** / runtime **26.60** / protocol **2225**, Python **3.11+**. Install **FFmpeg and ffprobe on PATH** and verify `ffmpeg -version` and `ffprobe -version` from the server's launch environment. No executable download occurs in the plugin.
+Target: Linux x86-64, Endstone **0.11.15**, BDS **1.26.60.6** / runtime **26.60** / protocol **2225**, Python **3.11+**. FFmpeg and ffprobe on PATH are used when available. Missing tools install automatically on the conversion worker on Linux/Windows x86-64 and are cached under `plugins/music/tools/`. Startup never waits for downloads.
+
+The first conversion needs HTTPS access to `github.com` and `release-assets.githubusercontent.com` and write access to the Music data folder. Downloads use a pinned [ffmpeg-static release](https://github.com/eugeneware/ffmpeg-static/releases/tag/b6.1.1) and verified SHA-256 digests. Cached tools work offline. If downloads are blocked, install FFmpeg and ffprobe on PATH and verify `ffmpeg -version` and `ffprobe -version` from the server's launch environment, then retry `/cmusic generate`.
 
 ## Install or upgrade
 
 1. Stop the server. Back up the full world, previous Music wheel and active Music data folder (normally `plugins/music/`), including uploads, config, playlist/disc storage, generated registries and `pack_metadata.json`. Keep the world's resource/behavior pack folders and both pack activation lists in the same backup.
-2. Download `endstone_music-0.2.1-py3-none-any.whl` from [the correct Music release](https://github.com/TheNINJALLO/endstone-music/releases/tag/v0.2.1). Replace the old Music wheel in `plugins/`; keep only one version. The optional setup ZIP includes a release-time copy of the docs; use this repository for current instructions.
+2. Download `endstone_music-0.2.2-py3-none-any.whl` from [Music v0.2.2](https://github.com/TheNINJALLO/endstone-music/releases/tag/v0.2.2), or build it locally into `dist/`. Replace the old Music wheel in `plugins/`; keep only one version. The optional setup ZIP includes a release-time copy of the docs; use this repository for current instructions.
 3. Preserve existing plugin data and pack UUID metadata. Start Endstone, inspect the logs and run `/cmusic status` as an operator. The target should report `adapter supported=True`.
 4. Set `target_world_name` in `config.json` to the direct folder name under `worlds/`. Place audio in the Music data folder's `uploads/`, then run `/cmusic generate` and wait for completion. Upgrades from 0.2.0 require this regeneration.
 5. Restart the server and reconnect clients so the new packs load. Accept/download the RP. The plugin activates the generated resource and behavior packs while preserving unrelated entries; it does not change the server's pack acceptance policy.
 6. Follow the [how-to](HOW-TO-USE.md) to create insertable single/album discs or operator global playlists. Generate again after adding global playlist IDs to register their custom items, or after changing jukebox presets to update spatial events. Restart/reconnect after pack changes.
-7. Complete [the acceptance checklist](docs/ACCEPTANCE.md) with at least two clients, including an ordinary player. Linux CI passed 97 tests, but live Linux startup, content registration and audible playback still need verification on the server.
+7. Complete [the acceptance checklist](docs/ACCEPTANCE.md) with at least two clients, including an ordinary player. See [the validation record](VALIDATION.md) for automated results; live startup, content registration and audible playback still need verification on the server.
 
 Existing `playlists.json` retains operator playlists and dimension-specific custom-block bindings. Insertable discs use `config.json` and `jukeboxes.json`. Keep these stores and generated metadata together. A valid reload stops global music and restarts stored-disc playlists; a server restart also restarts stored-disc playlists from the beginning.
 
 ## Offline generation and manual pack installation
 
-Run this from an environment where the plugin package is installed and FFmpeg/ffprobe are available. Use a copy of the existing Music data folder, especially its `pack_metadata.json`, to retain pack identities:
+Run this from an environment where the plugin package is installed. FFmpeg/ffprobe must be on PATH or already cached under the supplied data folder's `tools/` directory for a fully offline conversion; otherwise the command downloads them when needed. Use a copy of the existing Music data folder, especially its `pack_metadata.json`, to retain pack identities:
 
 ```bash
 python -m endstone_music.pack_generator \

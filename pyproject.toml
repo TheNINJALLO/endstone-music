@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "endstone_music"
-version = "0.2.1"
+version = "0.2.2"
 description = "Album discs, custom jukeboxes and synchronized music for Bedrock 26.60 / Endstone 0.11.15"
 requires-python = ">=3.11"
 authors = [{name = "Antigravity", email = "antigravity@example.com"}]
@@ -17,7 +17,7 @@ music = "endstone_music:EndstoneMusicPlugin"
 
 [tool.endstone]
 name = "music"
-version = "0.2.1"
+version = "0.2.2"
 main = "endstone_music:EndstoneMusicPlugin"
 description = "Custom music, album discs and positional jukeboxes"
 requires-python = ">=3.11"

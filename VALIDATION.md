@@ -1,4 +1,15 @@
-# Music 0.2.1 validation
+# Music 0.2.2 validation
+
+Date: 2026-11-16. Local host: Windows x86-64, Python 3.12.14, native Endstone 0.11.15 SDK.
+
+- `python run_tests.py`: 109 tests; 107 passed and two existing symlink checks skipped because this Windows account cannot create symlinks.
+- Twelve new checks cover PATH preference, Linux/Windows tool selection, initial installation, offline cache reuse, cache corruption, SHA-256 rejection, download failure/retry, invalid compression, cancellation and preservation of existing packs on installation failure.
+- A real conversion with an empty PATH downloaded both Windows x64 tools, verified their pinned SHA-256 digests and produced stereo and mono Vorbis OGG files. A fresh generator reused the cached executables with network access disabled and converted the source again.
+- Startup still registers its music hooks without accessing the download function. Conversion and tool setup use the existing background generation worker.
+
+No live server or audible Bedrock-client playback test was performed for this fix. Linux tool execution remains for Linux CI/server qualification; platform selection is covered locally.
+
+## Historical 0.2.1 validation
 
 Date: 2026-11-04. Local host: Windows x86-64, Python 3.11.9, native Endstone 0.11.15 SDK. Target: Linux x86-64, BDS 1.26.60.6, protocol 2225.
 

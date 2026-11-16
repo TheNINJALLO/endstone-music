@@ -1,3 +1,10 @@
+# 0.2.2
+
+- Automatically install missing FFmpeg and ffprobe during conversion on Linux/Windows x86-64, using pinned downloads and SHA-256 verification.
+- Prefer existing PATH tools and reuse verified downloads from the Music data folder; require no extra Python dependencies or system-wide installation.
+- Keep setup on the conversion worker, support cancellation and retries, and retain source audio and existing packs if setup fails.
+- Add installation, cache, checksum, platform, failure and cancellation regression tests and update setup instructions.
+
 # 0.2.1
 
 - Add follow-player single-track and album discs, persistent insert/eject and configurable per-block jukebox presets.

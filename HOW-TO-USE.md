@@ -1,8 +1,8 @@
-# Endstone Music 0.2.1 - How to use
+# Endstone Music 0.2.2 - How to use
 
 [README](README.md) | [Installation and rollback](INSTALL.md) | [Live server acceptance](docs/ACCEPTANCE.md)
 
-Target: Linux x86-64, Endstone **0.11.15**, BDS **1.26.60.6** (runtime **26.60**, protocol **2225**), Python **3.11+**. Install **FFmpeg and ffprobe on PATH** before generating packs. The plugin does not download executables.
+Target: Linux x86-64, Endstone **0.11.15**, BDS **1.26.60.6** (runtime **26.60**, protocol **2225**), Python **3.11+**. Conversion uses FFmpeg/ffprobe on PATH or installs missing tools automatically on Linux/Windows x86-64. The first conversion needs internet access; verified tools are cached under `plugins/music/tools/` for later offline use.
 
 Music has two ways to play albums:
 
@@ -13,11 +13,11 @@ Music has two ways to play albums:
 
 ## 1. Install and generate the audio packs
 
-1. Follow [INSTALL.md](INSTALL.md) to install the `endstone_music-0.2.1-py3-none-any.whl` release. Keep only one Music wheel in `plugins/`.
+1. Follow [INSTALL.md](INSTALL.md) to install `endstone_music-0.2.2-py3-none-any.whl`. Keep only one Music wheel in `plugins/`.
 2. Start the server once to create the plugin data folder, normally `plugins/music/`.
 3. Set `target_world_name` in that folder's `config.json` to the world's directory name, for example `Bedrock level`. It must be a direct folder under `worlds/`.
 4. Put your `.ogg`, `.mp3` or `.wav` files in `plugins/music/uploads/`. Use distinct names such as `intro.wav` and `main.mp3`.
-5. As an operator, run `/cmusic generate`. Wait for the completion message. Conversion runs in a background worker; a second generation request will not start another job.
+5. As an operator, run `/cmusic generate`. Wait for the completion message. Conversion and any first-time tool downloads run in a background worker; a second generation request will not start another job. The server log reports tool installation progress.
 6. Restart the server and reconnect clients. Accept/download the resource pack. Generation installs both the resource and behavior packs into the selected world and preserves unrelated pack-list entries.
 7. Run `/cmusic status`. For this target, it should show `adapter supported=True`. Use `generated_tracks.json` for exact sound IDs and measured durations: `intro.wav` becomes `custom.intro`.
 
@@ -147,4 +147,4 @@ All management commands use `endstone_music.command.cmusic` (operator by default
 - **Cannot eject:** leave an empty inventory slot. Check storage errors in the server log; use the operator recovery menu for inaccessible blocks.
 - **Reload fails:** correct the JSON and unknown track/preset references. A config/playlist validation failure keeps the current in-memory library and audio; wait for an active generation job before retrying.
 
-The release's Linux CI passed all 97 automated tests. Live Linux server integration and audible client playback still require the [acceptance checklist](docs/ACCEPTANCE.md), including movement, albums, permissions and pack registration.
+See [the validation record](VALIDATION.md) for automated results. Live Linux server integration and audible client playback still require the [acceptance checklist](docs/ACCEPTANCE.md), including movement, albums, permissions and pack registration.

@@ -16,6 +16,7 @@ from pathlib import Path
 from .library import atomic_json, number
 from .content_pack import CustomContent, reject_links
 from .playlists import ID as PLAYLIST_ID
+from .audio_tools import ensure_audio_tools
 
 GLOBAL_PREFIX = "endstone_music.global."
 
@@ -28,10 +29,11 @@ def sound_stem(path):
 
 
 class PackGenerator(CustomContent):
-    def __init__(self, key="endstone_music", data_path=None):
+    def __init__(self, key="endstone_music", data_path=None, logger=None):
         if not re.fullmatch(r"[a-z0-9_]{1,64}", key):
             raise ValueError("Invalid generated pack directory key")
         self.key, self.data_path = key, Path(data_path) if data_path else None
+        self.logger = logger
         self.metadata_file = self.data_path / "pack_metadata.json" if self.data_path else None
         self.pack_uuid, self.module_uuid, self.version = str(uuid.uuid4()), str(uuid.uuid4()), [1, 0, 0]
         self.metadata = {}
@@ -88,12 +90,9 @@ class PackGenerator(CustomContent):
             with self._process_lock:
                 self._process = None
 
-    @staticmethod
-    def _tools():
-        ffmpeg, ffprobe = shutil.which("ffmpeg"), shutil.which("ffprobe")
-        if not ffmpeg or not ffprobe:
-            raise RuntimeError("Install FFmpeg and ffprobe on PATH before generating music packs")
-        return ffmpeg, ffprobe
+    def _tools(self):
+        return ensure_audio_tools(self.data_path or Path.cwd() / "plugins" / "music",
+                                  cancel=self._cancel, logger=self.logger)
 
     def generate(self, upload_dir, output_dir, pack_name, playlists=None, *, jukeboxes=None):
         upload_dir, output_dir = Path(upload_dir), Path(output_dir)

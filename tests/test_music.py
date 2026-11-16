@@ -633,7 +633,7 @@ class EndstoneContractTests(unittest.TestCase):
         description = PluginDescription(name="music", version=attributes.pop("version"),
                                         commands=_build_commands(copy.deepcopy(attributes.pop("commands"))),
                                         permissions=_build_permissions(copy.deepcopy(attributes.pop("permissions"))), **attributes)
-        self.assertEqual(description.version, "0.2.1")
+        self.assertEqual(description.version, "0.2.2")
         handlers = []
         for name in dir(EndstoneMusicPlugin):
             method = getattr(EndstoneMusicPlugin, name)

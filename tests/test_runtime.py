@@ -95,8 +95,9 @@ class RuntimeTests(unittest.TestCase):
                 raise AssertionError("Audio dependencies must not be imported during startup")
             return original(name, *args, **kwargs)
 
-        with patch("builtins.__import__", side_effect=guarded):
+        with patch("builtins.__import__", side_effect=guarded), patch("endstone_music.audio_tools.urlopen") as download:
             self.plugin.on_enable()
+        download.assert_not_called()
         self.assertEqual(self.server.plugin_manager.register_event.call_count, 5)
         self.assertTrue(self.plugin.audio_adapter.supported)
         self.plugin.logger.error.assert_not_called()

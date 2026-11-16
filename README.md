@@ -29,7 +29,7 @@
 
 ## Overview
 
-Music **0.2.1** adds single-track and album discs, configurable jukeboxes, operator global playlists and generated audio/resource packs.
+Music **0.2.2** includes single-track and album discs, configurable jukeboxes, operator global playlists and generated audio/resource packs, with automatic setup of conversion tools.
 
 **Follow Player is on by default:** once a nearby listener hears a disc, the remaining track or album stays with them as they move away. The initial radius controls admission; it does not send that album to unrelated distant players. Global playlists intentionally play to everyone.
 
@@ -45,8 +45,8 @@ Music **0.2.1** adds single-track and album discs, configurable jukeboxes, opera
 ## How to use
 
 1. Install the wheel, then start the server once to create the Music data folder.
-2. Install **FFmpeg and ffprobe on PATH**. Set `target_world_name` in `plugins/music/config.json` to the actual world folder.
-3. Put audio in `plugins/music/uploads/`, run `/cmusic generate`, and wait for completion.
+2. Set `target_world_name` in `plugins/music/config.json` to the actual world folder.
+3. Put audio in `plugins/music/uploads/`, run `/cmusic generate`, and wait for completion. Missing FFmpeg/ffprobe tools install automatically on the conversion worker; the first conversion needs internet access.
 4. Restart the server and reconnect clients, accepting the generated resource pack. Generation installs both the resource and behavior packs.
 5. Open `/cmusic` > **Albums & Discs**, create a disc with one generated track ID or an ordered list, then select it to receive the item.
 6. Right-click a vanilla jukebox with that disc. Normal right-click ejects; sneak-right-click skips or restarts. Leave an empty inventory slot for ejection.
@@ -81,23 +81,24 @@ The [full command reference](HOW-TO-USE.md#command-reference) includes playlist 
 
 | Component | Target |
 |---|---|
-| Plugin | `0.2.1` |
+| Plugin | `0.2.2` |
 | Endstone / API | `0.11.15` / `0.11` |
 | BDS / runtime / protocol | `1.26.60.6` / `26.60` / `2225` |
 | Server platform | Linux x86-64 |
 | Python | `>=3.11` |
-| Audio tools | Installed `ffmpeg` and `ffprobe` |
+| Audio tools | Existing `ffmpeg`/`ffprobe` on PATH, or automatic download on Linux/Windows x86-64 |
 
-Playback is gated to the reviewed runtime combination. Unsupported runtimes keep administration and stored-disc recovery available, but disable new playback. The plugin does not download converter executables.
+Playback is gated to the reviewed runtime combination. Unsupported runtimes keep administration and stored-disc recovery available, but disable new playback. Missing converter executables are downloaded from a pinned [ffmpeg-static release](https://github.com/eugeneware/ffmpeg-static/releases/tag/b6.1.1), verified with SHA-256 and cached under `plugins/music/tools/`. Startup and playback do not trigger downloads; cached tools work offline. No pip command, administrator access or PATH changes are needed.
 
-All **97 automated tests passed in Linux CI**, including native API contracts, packet layout, audio conversion, playback, item persistence, migration and custom content. Official Linux/Windows server binaries were verified. Live Linux server integration and audible Bedrock-client playback remain unverified; follow the [acceptance checklist](docs/ACCEPTANCE.md).
+The current Windows validation ran **109 automated tests: 107 passed and two symlink checks were skipped**. A separate real conversion installed both tools with an empty PATH, produced stereo/mono Vorbis audio and reused the cache offline. The previous 0.2.1 release passed 97 tests in Linux CI. Live server integration and audible Bedrock-client playback remain unverified; see the [validation record](VALIDATION.md) and [acceptance checklist](docs/ACCEPTANCE.md).
 
 ## Install
 
-Download the wheel from [Music v0.2.1](https://github.com/TheNINJALLO/endstone-music/releases/tag/v0.2.1):
+Download `endstone_music-0.2.2-py3-none-any.whl` from [Music v0.2.2](https://github.com/TheNINJALLO/endstone-music/releases/tag/v0.2.2). To build the wheel from this source:
 
 ```bash
-gh release download v0.2.1 --repo TheNINJALLO/endstone-music --pattern '*.whl'
+python -m pip install build
+python -m build --wheel
 ```
 
 Stop the server, back up the world and Music data, replace the older Music wheel in `plugins/`, and restart. See [installation, upgrade and rollback](INSTALL.md). The optional setup ZIP contains the wheel and the documentation snapshot from release time; current guides are maintained in this repository.
