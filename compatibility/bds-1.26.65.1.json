@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "bds_package": "1.26.65.1",
+  "runtime_version": "26.65",
+  "protocol": 2225,
+  "endstone_version": "0.11.16",
+  "api_version": "0.11",
+  "adapter": "endstone-public-player-sound-v1",
+  "private_memory_hooks": false,
+  "source_commit": "23cb5758bdc070888cb89ecd1541ef25c4305b5c",
+  "platforms": {
+    "windows": {
+      "url": "https://www.minecraft.net/bedrockdedicatedserver/bin-win/bedrock-server-1.26.65.1.zip",
+      "archive_sha256": "c98b9824783b000b8a8d602e6f58467725316c8f635739b1e31998871995621e",
+      "executable": "bedrock_server.exe",
+      "executable_sha256": "1dd638ca380b1f30156a814e7bf568932f04f977b504601817961f782609dc4e"
+    },
+    "linux": {
+      "url": "https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.26.65.1.zip",
+      "archive_sha256": "4443e58064f5fa96f3464ab46c20cd89b631f7117e4c94d327f48c4eb64f9969",
+      "executable": "bedrock_server",
+      "executable_sha256": "ae606d06f9803b4e56b6af7ae15fdc149736fb27096221a0ec082881e897b067"
+    }
+  },
+  "qualification": {
+    "server_files_verified": true,
+    "server_smoke_tested": false,
+    "connected_client_tested": false,
+    "audible_playback_verified": false
+  }
+}

@@ -22,7 +22,7 @@ def inspect(platform, profile, directory, download):
     config = profile["platforms"][platform]
     directory = directory / platform
     directory.mkdir(parents=True, exist_ok=True)
-    archive = directory / "bedrock-server-1.26.60.6.zip"
+    archive = directory / f"bedrock-server-{profile['bds_package']}.zip"
     if not archive.exists():
         if not download:
             raise FileNotFoundError(f"Missing {archive}; supply --download or copy the official archive here")
@@ -64,9 +64,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--download", action="store_true")
     parser.add_argument("--platform", choices=("windows", "linux", "both"), default="both")
-    parser.add_argument("--directory", type=Path, default=ROOT / "scratch" / "bds-1.26.60.6")
+    parser.add_argument("--directory", type=Path, default=ROOT / "scratch" / "bds-1.26.65.1")
     args = parser.parse_args()
-    profile = json.loads((ROOT / "compatibility" / "bds-1.26.60.6.json").read_text())
+    profile = json.loads((ROOT / "compatibility" / "bds-1.26.65.1.json").read_text())
     platforms = ("windows", "linux") if args.platform == "both" else (args.platform,)
     with ThreadPoolExecutor(max_workers=2) as executor:
         results = list(executor.map(lambda platform: inspect(platform, profile, args.directory, args.download), platforms))

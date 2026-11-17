@@ -110,16 +110,18 @@ class SoundAdapter:
         self.rejected_packets = 0
         version = str(server.minecraft_version)
         endstone_version = str(server.version)
+        runtime = re.search(r"(?:^|\D)(?:1\.)?(26\.(?:60|65))(?:\D|$)", version)
+        sdk = re.search(r"(?:^|\D)(0\.11\.(?:15|16))(?:\D|$)", endstone_version)
         self.supported = (
             int(server.protocol_version) == PROTOCOL
-            and re.search(r"(?:^|\D)(?:1\.)?26\.60(?:\D|$)", version) is not None
-            and re.search(r"(?:^|\D)0\.11\.15(?:\D|$)", endstone_version) is not None
+            and runtime is not None and sdk is not None
+            and (runtime[1], sdk[1]) in {("26.60", "0.11.15"), ("26.65", "0.11.16")}
         )
         self.identity = f"BDS {version}, protocol {server.protocol_version}, Endstone {endstone_version}"
 
     def require_supported(self):
         if not self.supported:
-            raise RuntimeError(f"Music adapter requires BDS 1.26.60.6 / protocol 2225 / Endstone 0.11.15; found {self.identity}")
+            raise RuntimeError(f"Music adapter requires BDS 1.26.65.1 / Endstone 0.11.16 or BDS 1.26.60.6 / Endstone 0.11.15, protocol 2225; found {self.identity}")
 
     def play(self, player, location, sound, volume=1.0, pitch=1.0, *, position_seconds=0.0, bypass_range=False):
         self.require_supported()

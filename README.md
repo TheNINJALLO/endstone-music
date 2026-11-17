@@ -1,3 +1,7 @@
+[Download compatibility release v0.2.3](https://github.com/TheNINJALLO/endstone-music/releases/tag/v0.2.3).
+
+> Compatibility update **0.2.3** targets **Endstone 0.11.16 / BDS 1.26.65.1**, protocol **2225**, Python **3.11+**. API level remains **0.11**. Keep configuration and player data when replacing the wheel. Earlier acceptance records below describe their original builds; current qualification is tracked in the workspace upgrade report.
+
 <!-- endstone-professional-header:start -->
 <p align="center">
   <img src="docs/assets/banner.svg" width="100%" alt="Endstone Music &mdash; Album discs, follow-player audio, global playlists and custom jukeboxes">
@@ -9,9 +13,9 @@
 </p>
 
 <p align="center">
-  <img alt="Endstone 0.11.15" src="https://img.shields.io/badge/Endstone-0.11.15-52b7a8?style=flat-square">
+  <img alt="Endstone 0.11.16" src="https://img.shields.io/badge/Endstone-0.11.16-52b7a8?style=flat-square">
   <img alt="API 0.11" src="https://img.shields.io/badge/API-0.11-63b8ff?style=flat-square">
-  <img alt="BDS 1.26.60.6" src="https://img.shields.io/badge/BDS-1.26.60.6-8b7dff?style=flat-square">
+  <img alt="BDS 1.26.65.1" src="https://img.shields.io/badge/BDS-1.26.65.1-8b7dff?style=flat-square">
   <img alt="Python >=3.11" src="https://img.shields.io/badge/Python-%3E=3.11-3776AB?style=flat-square&amp;logo=python&amp;logoColor=white">
 </p>
 
@@ -29,7 +33,7 @@
 
 ## Overview
 
-Music **0.2.2** includes single-track and album discs, configurable jukeboxes, operator global playlists and generated audio/resource packs, with automatic setup of conversion tools.
+Music **0.2.3** includes single-track and album discs, configurable jukeboxes, operator global playlists and generated audio/resource packs, with automatic setup of conversion tools.
 
 **Follow Player is on by default:** once a nearby listener hears a disc, the remaining track or album stays with them as they move away. The initial radius controls admission; it does not send that album to unrelated distant players. Global playlists intentionally play to everyone.
 
@@ -81,9 +85,9 @@ The [full command reference](HOW-TO-USE.md#command-reference) includes playlist 
 
 | Component | Target |
 |---|---|
-| Plugin | `0.2.2` |
-| Endstone / API | `0.11.15` / `0.11` |
-| BDS / runtime / protocol | `1.26.60.6` / `26.60` / `2225` |
+| Plugin | `0.2.3` |
+| Endstone / API | `0.11.16` / `0.11` |
+| BDS / runtime / protocol | `1.26.65.1` / `26.65` / `2225` |
 | Server platform | Linux x86-64 |
 | Python | `>=3.11` |
 | Audio tools | Existing `ffmpeg`/`ffprobe` on PATH, or automatic download on Linux/Windows x86-64 |
@@ -94,7 +98,7 @@ The current Windows validation ran **109 automated tests: 107 passed and two sym
 
 ## Install
 
-Download `endstone_music-0.2.2-py3-none-any.whl` from [Music v0.2.2](https://github.com/TheNINJALLO/endstone-music/releases/tag/v0.2.2). To build the wheel from this source:
+Download `endstone_music-0.2.3-py3-none-any.whl` from [Music v0.2.3](https://github.com/TheNINJALLO/endstone-music/releases/tag/v0.2.3). To build the wheel from this source:
 
 ```bash
 python -m pip install build
@@ -117,7 +121,7 @@ Custom inserted discs use plugin storage rather than the vanilla record slot; ho
 - [Install and rollback](INSTALL.md)
 - [Native API and protocol adapter](docs/ABI_ADAPTER.md)
 - [Validation record](VALIDATION.md) and [server/client acceptance](docs/ACCEPTANCE.md)
-- [Exact BDS identities](compatibility/bds-1.26.60.6.json)
+- [Exact BDS identities](compatibility/bds-1.26.65.1.json)
 
 After installing the project and audio tools, run `python run_tests.py`. The [release workflow](.github/workflows/wheel-release.yml) reruns the suites on Linux, builds the wheel/setup bundle and uploads artifacts. A new package version on `main`, or a matching `v*` tag, publishes its release; branch builds leave existing releases unchanged.
 <!-- endstone-professional-header:end -->

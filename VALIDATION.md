@@ -1,3 +1,7 @@
+# Music 0.2.3 / Endstone 0.11.16 validation
+
+Date: 2026-11-16. The current SDK contract and playback suites ran against native Endstone 0.11.16 bindings: 110 checks, with 108 passing and two Windows symlink checks skipped. A new runtime-pair test verifies scoped playback on Bedrock 26.65 and rejects unreviewed SDK/runtime combinations. Both official BDS 1.26.65.1 archives and executable hashes were verified. Real client audio remains unqualified. Earlier release validation follows unchanged.
+
 # Music 0.2.2 validation
 
 Date: 2026-11-16. Local host: Windows x86-64, Python 3.12.14, native Endstone 0.11.15 SDK.

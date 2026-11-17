@@ -20,7 +20,7 @@ def main():
         assert f"Version: {version}" in metadata.splitlines()
         for source in (ROOT / "src" / "endstone_music").glob("*.py"):
             assert archive.read(f"endstone_music/{source.name}") == source.read_bytes(), f"Outdated wheel source: {source.name}"
-    bundle = ROOT / "dist" / f"endstone_music-{version}-bds-1.26.60.6.zip"
+    bundle = ROOT / "dist" / f"endstone_music-{version}-bds-1.26.65.1.zip"
     files = [ROOT / name for name in ("README.md", "HOW-TO-USE.md", "INSTALL.md", "CHANGELOG.md", "VALIDATION.md", "docs/ABI_ADAPTER.md", "docs/ACCEPTANCE.md", "docs/assets/banner.svg", "tools/inspect_bds.py")]
     files += list((ROOT / "examples").glob("*.json"))
     files += list((ROOT / "compatibility").rglob("*.json"))

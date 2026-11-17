@@ -1,8 +1,8 @@
-# Linux 26.60 acceptance checklist
+# Linux 26.65 acceptance checklist
 
-Use a test world with Endstone 0.11.15 and the exact Linux BDS 1.26.60.6 package. Keep the current configuration, generated pack, and `jukeboxes.json` when updating the plugin. This checklist requires an actual Bedrock 26.60 client; automated packet tests cannot prove audible playback.
+Use a test world with Endstone 0.11.16 and the exact Linux BDS 1.26.65.1 package. Keep the current configuration, generated pack, and `jukeboxes.json` when updating the plugin. This checklist requires an actual Bedrock 26.65 client; automated packet tests cannot prove audible playback.
 
-1. Install the 0.2.2 wheel and start the server. `/cmusic status` must report runtime 26.60, protocol 2225, Endstone 0.11.15, and `adapter supported=True`. No converter download should occur during plugin enable.
+1. Install the 0.2.3 wheel and start the server. `/cmusic status` must report runtime 26.65, protocol 2225, Endstone 0.11.16, and `adapter supported=True`. No converter download should occur during plugin enable.
 2. Put two audio files with distinct names in `plugins/music/uploads/`. Set `target_world_name` to the test world and run `/cmusic generate`. Normal gameplay should continue while the background job installs any missing FFmpeg/ffprobe tools and converts audio. Confirm installation logs and verified tools under `plugins/music/tools/` when PATH tools are absent. Source uploads must remain intact. Change an upload and regenerate with download access disabled to verify cached tools work offline.
 3. Restart the server and reconnect the client, accepting/downloading the generated resource pack. Confirm the generated RP/BP versions match their entries in `world_resource_packs.json` and `world_behavior_packs.json`, and both packs register without content-log errors.
 4. Follow [the complete how-to](../HOW-TO-USE.md), then open `/cmusic` → **Albums & Discs** → **Create album / single-track disc**. Create one disc with a single track ID and another with two ordered IDs (`custom.<normalized_filename>`). Select each saved disc in the menu to receive the corresponding item, or run `/cmusic give <id> [player name]`.

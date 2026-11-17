@@ -14,7 +14,7 @@ from endstone_music.music_controls import MusicControls
 from endstone_music.library import atomic_json
 
 class EndstoneMusicPlugin(MusicRuntime, MusicControls, Plugin):
-    version = "0.2.2"
+    version = "0.2.3"
     api_version = "0.11"
     
     commands = {

@@ -1,3 +1,8 @@
+# 0.2.3
+
+- Support Endstone 0.11.16 / BDS 1.26.65.1 with the unchanged protocol-2225 sound layout. Retain the explicitly reviewed legacy runtime pair and reject unreviewed combinations.
+- Update conversion-package tooling and runtime profiles while retaining automatic conversion dependencies.
+
 # 0.2.2
 
 - Automatically install missing FFmpeg and ffprobe during conversion on Linux/Windows x86-64, using pinned downloads and SHA-256 verification.

@@ -29,13 +29,13 @@ class MusicRuntime:
         self._audio_worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="music-pack")
         self.audio_adapter = SoundAdapter(self.server, self.logger)
         if not self.audio_adapter.supported:
-            self.logger.warning(self.audio_adapter.identity + "; playback disabled until a supported 26.60 runtime is used")
+            self.logger.warning(self.audio_adapter.identity + "; playback disabled until a supported Bedrock/Endstone runtime pair is used")
         self._load_library()
         self.playback = PlaybackEngine(self.server, self.audio_adapter, self.logger)
         self.setup_music()
         self.jukebox_controller = JukeboxController(self, self.library, self.playback, self.data_path / "jukeboxes.json")
         self._music_task = self.server.scheduler.run_task(self, self._music_tick, delay=1, period=5)
-        self.logger.info(f"26.60 music hooks ready: {len(self.library.tracks)} tracks, {len(self.library.discs)} discs/albums")
+        self.logger.info(f"Music hooks ready: {len(self.library.tracks)} tracks, {len(self.library.discs)} discs/albums")
 
     def _load_library(self):
         path = self.data_path / "generated_tracks.json"

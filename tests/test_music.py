@@ -111,6 +111,19 @@ class AdapterTests(unittest.TestCase):
                     adapter.play(self.player, self.player.location, "custom.first")
         self.assertFalse(self.player.calls)
 
+    def test_new_runtime_supports_scoped_playback_and_rejects_unreviewed_pairs(self):
+        server = fake_server(self.player)
+        server.minecraft_version, server.version = "26.65", "0.11.16"
+        adapter = SoundAdapter(server, Mock())
+        adapter.play(self.player, self.player.location, "custom.first", position_seconds=3.5)
+        event = types.SimpleNamespace(packet_id=86, player=self.player, payload=sound_payload())
+        adapter.on_packet_send(event)
+        self.assertEqual(struct.unpack("<f", event.payload[-4:])[0], 3.5)
+        self.assertEqual(adapter.rewritten_packets, 1)
+        for minecraft, endstone in (("26.65", "0.11.15"), ("26.60", "0.11.16"), ("26.65", "0.11.17")):
+            server.minecraft_version, server.version = minecraft, endstone
+            self.assertFalse(SoundAdapter(server, Mock()).supported)
+
     def test_optional_handle_is_preserved_when_seeking(self):
         data = sound_payload(handle=0x123456789ABCDEF0, offset=1)
         result = adapt_sound_payload(data, position_seconds=12.5, bypass_range=True)
@@ -633,7 +646,7 @@ class EndstoneContractTests(unittest.TestCase):
         description = PluginDescription(name="music", version=attributes.pop("version"),
                                         commands=_build_commands(copy.deepcopy(attributes.pop("commands"))),
                                         permissions=_build_permissions(copy.deepcopy(attributes.pop("permissions"))), **attributes)
-        self.assertEqual(description.version, "0.2.2")
+        self.assertEqual(description.version, "0.2.3")
         handlers = []
         for name in dir(EndstoneMusicPlugin):
             method = getattr(EndstoneMusicPlugin, name)

@@ -1,8 +1,8 @@
-# Endstone Music 0.2.2 - How to use
+# Endstone Music 0.2.3 - How to use
 
 [README](README.md) | [Installation and rollback](INSTALL.md) | [Live server acceptance](docs/ACCEPTANCE.md)
 
-Target: Linux x86-64, Endstone **0.11.15**, BDS **1.26.60.6** (runtime **26.60**, protocol **2225**), Python **3.11+**. Conversion uses FFmpeg/ffprobe on PATH or installs missing tools automatically on Linux/Windows x86-64. The first conversion needs internet access; verified tools are cached under `plugins/music/tools/` for later offline use.
+Target: Linux x86-64, Endstone **0.11.16**, BDS **1.26.65.1** (runtime **26.65**, protocol **2225**), Python **3.11+**. Conversion uses FFmpeg/ffprobe on PATH or installs missing tools automatically on Linux/Windows x86-64. The first conversion needs internet access; verified tools are cached under `plugins/music/tools/` for later offline use.
 
 Music has two ways to play albums:
 
@@ -13,7 +13,7 @@ Music has two ways to play albums:
 
 ## 1. Install and generate the audio packs
 
-1. Follow [INSTALL.md](INSTALL.md) to install `endstone_music-0.2.2-py3-none-any.whl`. Keep only one Music wheel in `plugins/`.
+1. Follow [INSTALL.md](INSTALL.md) to install `endstone_music-0.2.3-py3-none-any.whl`. Keep only one Music wheel in `plugins/`.
 2. Start the server once to create the plugin data folder, normally `plugins/music/`.
 3. Set `target_world_name` in that folder's `config.json` to the world's directory name, for example `Bedrock level`. It must be a direct folder under `worlds/`.
 4. Put your `.ogg`, `.mp3` or `.wav` files in `plugins/music/uploads/`. Use distinct names such as `intro.wav` and `main.mp3`.
